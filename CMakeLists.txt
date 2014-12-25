@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.6)
 project(twokinds)
 
+set(CMAKE_MODULE_PATH "${twokinds_SOURCE_DIR}/cmake")
+
 include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-std=c++11" HAVE_STD_CXX11)
@@ -14,6 +16,12 @@ if(HAVE_WALL_SWITCH)
 endif()
 
 
+find_package(SDL2 REQUIRED)
+find_package(PhysFS REQUIRED)
+
+
 add_executable(twokinds main.cpp)
+set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES ${SDL2_INCLUDE_DIR} ${PHYSFS_INCLUDE_DIR})
+target_link_libraries(twokinds  ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)
