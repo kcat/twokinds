@@ -20,8 +20,18 @@ find_package(SDL2 REQUIRED)
 find_package(PhysFS REQUIRED)
 
 
-add_executable(twokinds main.cpp)
-set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES ${SDL2_INCLUDE_DIR} ${PHYSFS_INCLUDE_DIR})
+set(HDRS src/engine.hpp
+)
+
+set(SRCS src/engine.cpp
+         main.cpp
+)
+
+add_executable(twokinds ${SRCS} ${HDRS})
+set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
+             "${twokinds_SOURCE_DIR}/src"
+             ${SDL2_INCLUDE_DIR}
+             ${PHYSFS_INCLUDE_DIR})
 target_link_libraries(twokinds  ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)
