@@ -1,0 +1,4 @@
+[Project]
+Name=twokinds
+Manager=KDevCMakeManager
+VersionControl=kdevgit
