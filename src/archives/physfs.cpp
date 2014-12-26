@@ -92,13 +92,16 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
         char **list = PHYSFS_enumerateFiles(dirpath);
         for(size_t i = 0;list[i];i++)
         {
-            std::string fullName = (dirpath ? std::string(dirpath)+"/" : std::string())+list[i];
+            std::string fullName = std::string(dirpath)+list[i];
             if(PHYSFS_isDirectory(fullName.c_str()))
             {
                 if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
                     names->push_back(fullName);
                 if(recurse)
+                {
+                    fullName += "/";
                     enumerateNames(fullName.c_str(), names, pattern, recurse, dirs);
+                }
             }
             else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
                 names->push_back(fullName);
@@ -111,8 +114,7 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
         char **list = PHYSFS_enumerateFiles(dirpath);
         for(size_t i = 0;list[i];i++)
         {
-            std::string dirName = dirpath ? std::string(dirpath)+"/" : std::string();
-            std::string fullName = dirName+list[i];
+            std::string fullName = std::string(dirpath)+list[i];
             if(PHYSFS_isDirectory(fullName.c_str()))
             {
                 if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
@@ -121,13 +123,16 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
                     info.archive = this;
                     info.filename = fullName;
                     info.basename = list[i];
-                    info.path = dirName;
+                    info.path = dirpath;
                     info.compressedSize = 0;
                     info.uncompressedSize = 0;
                     infos->push_back(info);
                 }
                 if(recurse)
+                {
+                    fullName += "/";
                     enumerateInfo(fullName.c_str(), infos, pattern, recurse, dirs);
+                }
             }
             else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
             {
@@ -135,7 +140,7 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
                 info.archive = this;
                 info.filename = fullName;
                 info.basename = list[i];
-                info.path = dirName;
+                info.path = dirpath;
                 info.compressedSize = 0;
                 info.uncompressedSize = 0;
                 infos->push_back(info);
@@ -173,14 +178,14 @@ public:
     {
         Ogre::StringVectorPtr names(OGRE_NEW_T(Ogre::StringVector, Ogre::MEMCATEGORY_GENERAL)(),
                                     Ogre::SPFM_DELETE_T);
-        enumerateNames(nullptr, names, Ogre::String(), recursive, dirs);
+        enumerateNames("/", names, Ogre::String(), recursive, dirs);
         return names;
     }
     Ogre::FileInfoListPtr listFileInfo(bool recursive, bool dirs)
     {
         Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList, Ogre::MEMCATEGORY_GENERAL)(),
                                     Ogre::SPFM_DELETE_T);
-        enumerateInfo(nullptr, infos, Ogre::String(), recursive, dirs);
+        enumerateInfo("/", infos, Ogre::String(), recursive, dirs);
         return infos;
     }
 
@@ -188,14 +193,14 @@ public:
     {
         Ogre::StringVectorPtr names(OGRE_NEW_T(Ogre::StringVector, Ogre::MEMCATEGORY_GENERAL)(),
                                     Ogre::SPFM_DELETE_T);
-        enumerateNames(nullptr, names, pattern, recursive, dirs);
+        enumerateNames("/", names, pattern, recursive, dirs);
         return names;
     }
     virtual Ogre::FileInfoListPtr findFileInfo(const Ogre::String &pattern, bool recursive, bool dirs) const
     {
         Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList, Ogre::MEMCATEGORY_GENERAL)(),
                                     Ogre::SPFM_DELETE_T);
-        enumerateInfo(nullptr, infos, pattern, recursive, dirs);
+        enumerateInfo("/", infos, pattern, recursive, dirs);
         return infos;
     }
 
