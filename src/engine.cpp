@@ -235,7 +235,9 @@ bool Engine::go(void)
 
     PhysFSFactory::getSingleton().Mount(".");
     Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
-        "physfs", PhysFSFactory::getSingleton().getType()
+        "physfs", PhysFSFactory::getSingleton().getType(),
+        Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
+        true /* recursive */
     );
 
     // Initialise all resource groups
