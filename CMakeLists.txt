@@ -78,6 +78,10 @@ if(NOT OGRE_BUILD_PLATFORM_IPHONE)
 endif()
 
 
+configure_file("${twokinds_SOURCE_DIR}/plugins.cfg.in"
+               "${CMAKE_BINARY_DIR}/plugins.cfg")
+
+
 set(HDRS src/engine.hpp
 )
 
