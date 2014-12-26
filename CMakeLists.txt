@@ -82,10 +82,12 @@ configure_file("${twokinds_SOURCE_DIR}/plugins.cfg.in"
                "${CMAKE_BINARY_DIR}/plugins.cfg")
 
 
-set(HDRS src/engine.hpp
+set(HDRS src/archives/physfs.hpp
+         src/engine.hpp
 )
 
-set(SRCS src/engine.cpp
+set(SRCS src/archives/physfs.cpp
+         src/engine.cpp
          main.cpp
 )
 

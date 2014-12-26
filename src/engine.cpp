@@ -10,9 +10,12 @@
 #include <OgreCamera.h>
 #include <OgreRenderWindow.h>
 #include <OgreViewport.h>
+#include <OgreArchiveManager.h>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
+
+#include "archives/physfs.hpp"
 
 
 namespace TK
@@ -201,7 +204,9 @@ bool Engine::go(void)
     }
 
     // Construct Ogre::Root
-    mRoot = new Ogre::Root("plugins.cfg");
+    mRoot = new Ogre::Root("plugins.cfg", "ogre.cfg", "ogre.log");
+
+    Ogre::ArchiveManager::getSingleton().addArchiveFactory(new PhysFSFactory);
 
     // Configure
     {
@@ -225,6 +230,10 @@ bool Engine::go(void)
         mRoot->initialise(false);
         mWindow = createRenderWindow(mSDLWindow);
     }
+
+    Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
+        "physfs", PhysFSFactory::getSingleton().getType()
+    );
 
     // Initialise all resource groups
     Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
