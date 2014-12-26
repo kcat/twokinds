@@ -1,7 +1,11 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
+#include <OgreWindowEventUtilities.h>
+#include <OgreFrameListener.h>
+
 struct SDL_Window;
+struct SDL_WindowEvent;
 
 namespace Ogre
 {
@@ -15,7 +19,7 @@ namespace Ogre
 namespace TK
 {
 
-class Engine
+class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 {
     SDL_Window *mSDLWindow;
 
@@ -26,6 +30,11 @@ class Engine
     Ogre::Viewport *mViewport;
 
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
+
+    void handleWindowEvent(const SDL_WindowEvent &evt);
+    bool pumpEvents();
+
+    virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);
 
 public:
     Engine(void);

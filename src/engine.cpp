@@ -131,6 +131,63 @@ Ogre::RenderWindow *Engine::createRenderWindow(SDL_Window *win)
 }
 
 
+void Engine::handleWindowEvent(const SDL_WindowEvent &evt)
+{
+    switch(evt.event)
+    {
+        case SDL_WINDOWEVENT_SHOWN:
+            mWindow->setVisible(true);
+            break;
+
+        case SDL_WINDOWEVENT_HIDDEN:
+            mWindow->setVisible(false);
+            break;
+
+        case SDL_WINDOWEVENT_EXPOSED:
+            // Needs redraw
+            break;
+
+        case SDL_WINDOWEVENT_ENTER:
+        case SDL_WINDOWEVENT_LEAVE:
+        case SDL_WINDOWEVENT_FOCUS_GAINED:
+        case SDL_WINDOWEVENT_FOCUS_LOST:
+            break;
+
+        case SDL_WINDOWEVENT_CLOSE:
+            // FIXME: Inject an SDL_QUIT event? Seems to happen anyway...
+            break;
+
+        default:
+            std::cerr<< "Unhandled window event: "<<(int)evt.event <<std::endl;
+    }
+}
+
+bool Engine::pumpEvents()
+{
+    SDL_PumpEvents();
+
+    SDL_Event evt;
+    while(SDL_PollEvent(&evt))
+    {
+        switch(evt.type)
+        {
+        case SDL_WINDOWEVENT:
+            handleWindowEvent(evt.window);
+            break;
+
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            break;
+
+        case SDL_QUIT:
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 bool Engine::go(void)
 {
     // Kindly ask SDL not to trash our OGL context
@@ -143,10 +200,10 @@ bool Engine::go(void)
         return false;
     }
 
-    // construct Ogre::Root
+    // Construct Ogre::Root
     mRoot = new Ogre::Root("plugins.cfg");
 
-    // configure
+    // Configure
     {
         // Show the configuration dialog and initialise the system
         if(!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
@@ -169,19 +226,25 @@ bool Engine::go(void)
         mWindow = createRenderWindow(mSDLWindow);
     }
 
-    SDL_Event evt;
-    while(SDL_WaitEvent(&evt))
-    {
-        switch(evt.type)
-        {
-        case SDL_KEYDOWN:
-        case SDL_KEYUP:
-            return true;
+    // Initialise all resource groups
+    Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
 
-        case SDL_QUIT:
-            return false;
-        }
-    }
+    // And away we go!
+    mRoot->addFrameListener(this);
+    mRoot->startRendering();
+
+    return true;
+}
+
+
+bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
+{
+    if(!pumpEvents() || mWindow->isClosed())
+        return false;
+
+    const Uint8 *keystate = SDL_GetKeyboardState(NULL);
+    if(keystate[SDL_SCANCODE_ESCAPE])
+        return false;
 
     return true;
 }
