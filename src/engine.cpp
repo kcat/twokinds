@@ -233,6 +233,7 @@ bool Engine::go(void)
         mWindow = createRenderWindow(mSDLWindow);
     }
 
+    PhysFSFactory::getSingleton().Mount(".");
     Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
         "physfs", PhysFSFactory::getSingleton().getType()
     );
