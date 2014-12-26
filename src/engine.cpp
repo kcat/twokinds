@@ -35,6 +35,8 @@ Engine::~Engine(void)
 {
     if(mRoot)
     {
+        mRoot->removeFrameListener(this);
+
         if(mSceneMgr)
         {
             if(mCamera)
