@@ -46,6 +46,10 @@ find_package(OGRE REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(PhysFS REQUIRED)
 
+if(NOT OGRE_RTShaderSystem_FOUND)
+    message(FATAL_ERROR "Failed to find Ogre RTShaderSystem")
+endif()
+
 # Find Boost
 if(NOT OGRE_BUILD_PLATFORM_IPHONE)
     if(WIN32 OR APPLE)
@@ -95,8 +99,9 @@ add_executable(twokinds ${SRCS} ${HDRS})
 set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
              "${twokinds_SOURCE_DIR}/src"
              ${OGRE_INCLUDE_DIRS}
+             ${OGRE_RTShaderSystem_DIRS}
              ${SDL2_INCLUDE_DIR}
              ${PHYSFS_INCLUDE_DIR})
-target_link_libraries(twokinds  ${OGRE_LIBRARIES} ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
+target_link_libraries(twokinds  ${OGRE_LIBRARIES} ${OGRE_RTShaderSystem_LIBRARIES} ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)
