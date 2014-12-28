@@ -1,0 +1,17 @@
+[General]
+path=${DATA_ROOT}/RTShaderLib.zip
+path=${DATA_ROOT}/penguin.zip
+path=${DATA_ROOT}
+
+[Shaders]
+path=/RTShaderLib/GLSL150
+
+[Materials]
+path=/RTShaderLib/materials
+path=/materials/scripts
+
+[Textures]
+path=/materials/textures
+
+[Meshes]
+path=/meshes
