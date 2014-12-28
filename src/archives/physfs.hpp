@@ -20,7 +20,7 @@ public:
     virtual Ogre::Archive *createInstance(const Ogre::String &name, bool readOnly);
     virtual void destroyInstance(Ogre::Archive *inst);
 
-    void Mount(const char *path, const char *mountPoint=nullptr, int append=0) const;
+    void Mount(const char *path, const char *mountPoint=nullptr, bool append=false) const;
 };
 
 } // namespace TK

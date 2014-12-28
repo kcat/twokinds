@@ -261,7 +261,7 @@ void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
     delete inst;
 }
 
-void PhysFSFactory::Mount(const char *path, const char *mountPoint, int append) const
+void PhysFSFactory::Mount(const char *path, const char *mountPoint, bool append) const
 {
     auto &logMgr = Ogre::LogManager::getSingleton();
     logMgr.stream()<< "Adding new file source "<<path<<" to "<<(mountPoint?mountPoint:"<root>")<<"...";
