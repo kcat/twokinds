@@ -47,7 +47,13 @@ find_package(SDL2 REQUIRED)
 find_package(PhysFS REQUIRED)
 
 if(NOT OGRE_RTShaderSystem_FOUND)
-    message(FATAL_ERROR "Failed to find Ogre RTShaderSystem")
+    message(FATAL_ERROR "Failed to find Ogre RTShaderSystem component")
+endif()
+if(NOT OGRE_Terrain_FOUND)
+    message(FATAL_ERROR "Failed to find Ogre Terrain component")
+endif()
+if(NOT OGRE_Paging_FOUND)
+    message(FATAL_ERROR "Failed to find Ogre Paging component")
 endif()
 
 # Find Boost
@@ -103,9 +109,11 @@ add_executable(twokinds ${SRCS} ${HDRS})
 set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
              "${twokinds_SOURCE_DIR}/src"
              ${OGRE_INCLUDE_DIRS}
-             ${OGRE_RTShaderSystem_DIRS}
+             ${OGRE_RTShaderSystem_INCLUDE_DIRS}
+             ${OGRE_Terrain_INCLUDE_DIRS}
+             ${OGRE_Paging_INCLUDE_DIRS}
              ${SDL2_INCLUDE_DIR}
              ${PHYSFS_INCLUDE_DIR})
-target_link_libraries(twokinds  ${OGRE_LIBRARIES} ${OGRE_RTShaderSystem_LIBRARIES} ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
+target_link_libraries(twokinds  ${OGRE_LIBRARIES} ${OGRE_RTShaderSystem_LIBRARIES} ${OGRE_Terrain_LIBRARIES} ${OGRE_Paging_LIBRARIES} ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)
