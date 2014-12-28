@@ -86,21 +86,23 @@ public:
 typedef Ogre::SharedPtr<PhysFileStream> PhysFileStreamPtr;
 
 
-class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive> {
-    void enumerateNames(const char *dirpath, Ogre::StringVectorPtr &names, const Ogre::String &pattern, bool recurse, bool dirs) const
+class PhysFSArchive : public Ogre::Archive {
+    const Ogre::String mBasePath;
+
+    void enumerateNames(const Ogre::String &dirpath, Ogre::StringVectorPtr &names, const Ogre::String &pattern, bool recurse, bool dirs) const
     {
-        char **list = PHYSFS_enumerateFiles(dirpath);
+        char **list = PHYSFS_enumerateFiles((mBasePath+dirpath).c_str());
         for(size_t i = 0;list[i];i++)
         {
-            std::string fullName = std::string(dirpath)+list[i];
-            if(PHYSFS_isDirectory(fullName.c_str()))
+            std::string fullName = dirpath+list[i];
+            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
             {
                 if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
                     names->push_back(fullName);
                 if(recurse)
                 {
                     fullName += "/";
-                    enumerateNames(fullName.c_str(), names, pattern, recurse, dirs);
+                    enumerateNames(fullName, names, pattern, recurse, dirs);
                 }
             }
             else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
@@ -109,13 +111,13 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
         PHYSFS_freeList(list);
     }
 
-    void enumerateInfo(const char *dirpath, Ogre::FileInfoListPtr &infos, const Ogre::String &pattern, bool recurse, bool dirs) const
+    void enumerateInfo(const Ogre::String &dirpath, Ogre::FileInfoListPtr &infos, const Ogre::String &pattern, bool recurse, bool dirs) const
     {
-        char **list = PHYSFS_enumerateFiles(dirpath);
+        char **list = PHYSFS_enumerateFiles((mBasePath+dirpath).c_str());
         for(size_t i = 0;list[i];i++)
         {
-            std::string fullName = std::string(dirpath)+list[i];
-            if(PHYSFS_isDirectory(fullName.c_str()))
+            std::string fullName = dirpath+list[i];
+            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
             {
                 if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
                 {
@@ -131,7 +133,7 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
                 if(recurse)
                 {
                     fullName += "/";
-                    enumerateInfo(fullName.c_str(), infos, pattern, recurse, dirs);
+                    enumerateInfo(fullName, infos, pattern, recurse, dirs);
                 }
             }
             else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
@@ -150,8 +152,8 @@ class PhysFSArchive : public Ogre::Archive, public Ogre::Singleton<PhysFSArchive
     }
 
 public:
-    PhysFSArchive(const Ogre::String &name, const Ogre::String &archType, bool readOnly)
-      : Archive(name, archType)
+    PhysFSArchive(const Ogre::String &name, const Ogre::String &archType, const Ogre::String &base, bool readOnly)
+      : Archive(name, archType), mBasePath(base)
     { mReadOnly = readOnly; }
 
     virtual bool isCaseSensitive() const { return true; }
@@ -165,9 +167,9 @@ public:
         PhysFileStreamPtr stream;
         PHYSFS_File *file = nullptr;
         if(readOnly)
-            file = PHYSFS_openRead(filename.c_str());
+            file = PHYSFS_openRead((mBasePath+"/"+filename).c_str());
         else if(!mReadOnly)
-            file = PHYSFS_openAppend(filename.c_str());
+            file = PHYSFS_openAppend((mBasePath+"/"+filename).c_str());
         if(file)
             stream.bind(OGRE_NEW_T(PhysFileStream, Ogre::MEMCATEGORY_GENERAL)(file),
                                    Ogre::SPFM_DELETE_T);
@@ -206,16 +208,14 @@ public:
 
     virtual bool exists(const Ogre::String &filename)
     {
-        return PHYSFS_exists(filename.c_str());
+        return PHYSFS_exists((mBasePath+"/"+filename).c_str());
     }
 
     virtual time_t getModifiedTime(const Ogre::String &filename)
     {
-        return PHYSFS_getLastModTime(filename.c_str());
+        return PHYSFS_getLastModTime((mBasePath+"/"+filename).c_str());
     }
 };
-template<>
-PhysFSArchive *Ogre::Singleton<PhysFSArchive>::msSingleton = nullptr;
 
 } // namespace
 
@@ -250,9 +250,10 @@ const Ogre::String &PhysFSFactory::getType() const
 
 Ogre::Archive *PhysFSFactory::createInstance(const Ogre::String &name, bool readOnly)
 {
-    if(name != "physfs")
-        throw std::runtime_error("Unexpected PhysFS archive name: "+name);
-    return new PhysFSArchive(name, getType(), readOnly);
+    Ogre::String base = name;
+    if(!base.empty() && *base.rbegin() == '/')
+        base.erase(base.length()-1);
+    return new PhysFSArchive(name, getType(), base, readOnly);
 }
 
 void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
@@ -260,7 +261,7 @@ void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
     delete inst;
 }
 
-void PhysFSFactory::Mount(const char* path, const char* mountPoint, int append) const
+void PhysFSFactory::Mount(const char *path, const char *mountPoint, int append) const
 {
     auto &logMgr = Ogre::LogManager::getSingleton();
     logMgr.stream()<< "Adding new file source "<<path<<" to "<<(mountPoint?mountPoint:"<root>")<<"...";

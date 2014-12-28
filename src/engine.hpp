@@ -13,7 +13,6 @@ namespace Ogre
     class RenderWindow;
     class SceneManager;
     class Camera;
-    class Viewport;
 }
 
 namespace TK
@@ -27,7 +26,6 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::RenderWindow *mWindow;
     Ogre::SceneManager *mSceneMgr;
     Ogre::Camera *mCamera;
-    Ogre::Viewport *mViewport;
 
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 

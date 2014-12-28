@@ -7,15 +7,84 @@
 
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
-#include <OgreCamera.h>
 #include <OgreRenderWindow.h>
-#include <OgreViewport.h>
+#include <OgreCamera.h>
 #include <OgreArchiveManager.h>
+#include <OgreMaterialManager.h>
+#include <OgreEntity.h>
+#include <OgreTechnique.h>
+#include <Compositor/OgreCompositorManager2.h>
+#include <RTShaderSystem/OgreRTShaderSystem.h>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
 
 #include "archives/physfs.hpp"
+
+
+namespace
+{
+
+// Lifted from SampleBrowser.h
+class ShaderGeneratorTechniqueResolverListener : public Ogre::MaterialManager::Listener
+{
+protected:
+    Ogre::RTShader::ShaderGenerator *mShaderGenerator; // The shader generator instance.
+
+public:
+    ShaderGeneratorTechniqueResolverListener(Ogre::RTShader::ShaderGenerator *shaderGenerator)
+      : mShaderGenerator(shaderGenerator)
+    { }
+
+    /**
+     * This is the hook point where shader based technique will be created. It
+     * will be called whenever the material manager won't find appropriate
+     * technique that satisfy the target scheme name. If the scheme name is out
+     * target RT Shader System scheme name we will try to create shader
+     * generated technique for it.
+     */
+    virtual Ogre::Technique *handleSchemeNotFound(unsigned short schemeIndex,
+        const Ogre::String &schemeName, Ogre::Material *originalMaterial,
+        unsigned short lodIndex, const Ogre::Renderable *rend)
+    {
+        Ogre::Technique *generatedTech = nullptr;
+
+        // Case this is the default shader generator scheme.
+        if(schemeName == Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME)
+        {
+            bool techniqueCreated;
+
+            // Create shader generated technique for this material.
+            techniqueCreated = mShaderGenerator->createShaderBasedTechnique(
+                originalMaterial->getName(), Ogre::MaterialManager::DEFAULT_SCHEME_NAME,
+                schemeName
+            );
+
+            // Case technique registration succeeded.
+            if(techniqueCreated)
+            {
+                // Force creating the shaders for the generated technique.
+                mShaderGenerator->validateMaterial(schemeName, originalMaterial->getName());
+
+                // Grab the generated technique.
+                Ogre::Material::TechniqueIterator itTech = originalMaterial->getTechniqueIterator();
+                while(itTech.hasMoreElements())
+                {
+                    Ogre::Technique *curTech = itTech.getNext();
+                    if(curTech->getSchemeName() == schemeName)
+                    {
+                        generatedTech = curTech;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return generatedTech;
+    }
+};
+
+} // namespace
 
 
 namespace TK
@@ -27,7 +96,6 @@ Engine::Engine(void)
   , mWindow(nullptr)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
-  , mViewport(nullptr)
 {
 }
 
@@ -49,10 +117,6 @@ Engine::~Engine(void)
 
         if(mWindow)
         {
-            if(mViewport)
-                mWindow->removeViewport(mViewport);
-            mViewport = nullptr;
-
             mWindow->destroy();
             mWindow = nullptr;
         }
@@ -233,15 +297,77 @@ bool Engine::go(void)
         mWindow = createRenderWindow(mSDLWindow);
     }
 
+    // Application resource paths
+    PhysFSFactory::getSingleton().Mount("../RTShaderLib.zip", "RTShaderLib");
     PhysFSFactory::getSingleton().Mount(".");
+
+    // Resources necessary for the run-time shader system.
     Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
-        "physfs", PhysFSFactory::getSingleton().getType(),
+        "/RTShaderLib/GLSL150", PhysFSFactory::getSingleton().getType(),
+        "Shaders", true
+    );
+    Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
+        "/RTShaderLib/materials", PhysFSFactory::getSingleton().getType(),
+        "Materials", true
+    );
+
+    // General game resources
+    Ogre::ResourceGroupManager::getSingleton().addResourceLocation(
+        "", PhysFSFactory::getSingleton().getType(),
         Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
         true /* recursive */
     );
 
-    // Initialise all resource groups
+    /* Necessary for D3D11/GL3+. They have no fixed function pipeline. Must be
+     * initialized before resources! */
+    Ogre::RTShader::ShaderGenerator::initialize();
+    auto &shaderGenerator = Ogre::RTShader::ShaderGenerator::getSingleton();
+
+    ShaderGeneratorTechniqueResolverListener sgtrl(&shaderGenerator);
+    Ogre::MaterialManager::getSingleton().addListener(&sgtrl);
+
+    /* Initialise all resource groups. Ogre is sensitive to the shaders being
+     * initialized after the materials, so ensure the shaders get initialized
+     * first. */
+    Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Shaders");
+    Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Materials");
     Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
+
+    const size_t numThreads = std::max(1u, Ogre::PlatformInformation::getNumLogicalCores());
+    Ogre::InstancingTheadedCullingMethod threadedCullingMethod = Ogre::INSTANCING_CULLING_SINGLETHREAD;
+    if(numThreads > 1)
+        threadedCullingMethod = Ogre::INSTANCING_CULLING_THREADED;
+    mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC, numThreads, threadedCullingMethod);
+
+    shaderGenerator.addSceneManager(mSceneMgr);
+
+    // Add a specialized sub-render (per-pixel lighting) state to the default scheme render state
+    Ogre::RTShader::RenderState *rstate = shaderGenerator.createOrRetrieveRenderState(
+        Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME
+    ).first;
+    rstate->reset();
+
+    //shaderGenerator.addSubRenderStateFactory(new Ogre::RTShader::PerPixelLightingFactory);
+    rstate->addTemplateSubRenderState(shaderGenerator.createSubRenderState(Ogre::RTShader::PerPixelLighting::Type));
+
+    mCamera = mSceneMgr->createCamera("PlayerCam");
+    //mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(mCamera);
+    mRoot->getCompositorManager2()->addWorkspace(
+        mSceneMgr, mWindow, mCamera, "MyOwnWorkspace", true
+    );
+
+    // Alter the camera aspect ratio to match the window
+    mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
+
+    /* Create something simple to look at */
+    Ogre::Entity *ent = mSceneMgr->createEntity("ogrehead.mesh");
+    mSceneMgr->getRootSceneNode()->createChildSceneNode(Ogre::SCENE_DYNAMIC, Ogre::Vector3(0,0,-250))->attachObject(ent);
+
+    /* Make a light so we can see what we're looking at */
+    mSceneMgr->setAmbientLight(Ogre::ColourValue(0.3, 0.3, 0.3));
+    Ogre::SceneNode *lightNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
+    lightNode->setPosition(20, 80, 50);
+    lightNode->attachObject(mSceneMgr->createLight());
 
     // And away we go!
     mRoot->addFrameListener(this);
