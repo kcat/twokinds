@@ -9,6 +9,11 @@
 
 #include "physfs.h"
 
+#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
+#define const_OGRE2 const
+#else
+#define const_OGRE2
+#endif
 
 namespace
 {
@@ -111,7 +116,7 @@ class PhysFSArchive : public Ogre::Archive {
         PHYSFS_freeList(list);
     }
 
-    void enumerateInfo(const Ogre::String &dirpath, Ogre::FileInfoListPtr &infos, const Ogre::String &pattern, bool recurse, bool dirs) const
+    void enumerateInfo(const Ogre::String &dirpath, Ogre::FileInfoListPtr &infos, const Ogre::String &pattern, bool recurse, bool dirs) const_OGRE2
     {
         char **list = PHYSFS_enumerateFiles((mBasePath+dirpath).c_str());
         for(size_t i = 0;list[i];i++)
@@ -162,7 +167,7 @@ public:
     virtual void unload() { }
 
     // Open a file in the archive.
-    virtual Ogre::DataStreamPtr open(const Ogre::String &filename, bool readOnly) const
+    virtual Ogre::DataStreamPtr open(const Ogre::String &filename, bool readOnly) const_OGRE2
     {
         PhysFileStreamPtr stream;
         PHYSFS_File *file = nullptr;
@@ -198,7 +203,7 @@ public:
         enumerateNames("/", names, pattern, recursive, dirs);
         return names;
     }
-    virtual Ogre::FileInfoListPtr findFileInfo(const Ogre::String &pattern, bool recursive, bool dirs) const
+    virtual Ogre::FileInfoListPtr findFileInfo(const Ogre::String &pattern, bool recursive, bool dirs) const_OGRE2
     {
         Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList, Ogre::MEMCATEGORY_GENERAL)(),
                                     Ogre::SPFM_DELETE_T);

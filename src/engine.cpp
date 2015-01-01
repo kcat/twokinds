@@ -9,14 +9,24 @@
 #include <OgreSceneManager.h>
 #include <OgreRenderWindow.h>
 #include <OgreCamera.h>
+#include <OgreViewport.h>
 #include <OgreArchiveManager.h>
 #include <OgreMaterialManager.h>
 #include <OgreEntity.h>
+#include <OgreSceneNode.h>
 #include <OgreTechnique.h>
 #include <OgreConfigFile.h>
 
+#include <OgreTerrain.h>
+#include <OgreTerrainGroup.h>
+#include <OgreTerrainMaterialGeneratorA.h>
+
+#include <OgreRTShaderSystem.h>
+
+#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
 #include <Compositor/OgreCompositorManager2.h>
-#include <RTShaderSystem/OgreRTShaderSystem.h>
+#endif
+#include <OgreLogManager.h>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -98,11 +108,21 @@ Engine::Engine(void)
   , mWindow(nullptr)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
+  , mViewport(nullptr)
+  , mTerrainGroup(nullptr)
+  , mTerrainGlobals(nullptr)
+  , mTerrainsImported(false)
 {
 }
 
 Engine::~Engine(void)
 {
+    OGRE_DELETE mTerrainGroup;
+    mTerrainGroup = nullptr;
+
+    OGRE_DELETE mTerrainGlobals;
+    mTerrainGlobals = nullptr;
+
     if(mRoot)
     {
         mRoot->removeFrameListener(this);
@@ -119,6 +139,10 @@ Engine::~Engine(void)
 
         if(mWindow)
         {
+            if(mViewport)
+                mWindow->removeViewport(mViewport->getZOrder());
+            mViewport = nullptr;
+
             mWindow->destroy();
             mWindow = nullptr;
         }
@@ -246,6 +270,21 @@ bool Engine::pumpEvents()
             handleWindowEvent(evt.window);
             break;
 
+        case SDL_MOUSEMOTION:
+            /* Left button */
+            if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
+            {
+                static float x=0.0f, y=0.0f;
+                /* Rotation (x motion rotates around y, y motion rotates around x) */
+                x += evt.motion.yrel * 0.1f;
+                y += evt.motion.xrel * 0.1f;
+
+                Ogre::Matrix3 mat3;
+                mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+                mCamera->setOrientation(mat3);
+            }
+            break;
+
         case SDL_KEYDOWN:
         case SDL_KEYUP:
             break;
@@ -259,6 +298,96 @@ bool Engine::pumpEvents()
 }
 
 
+#define TERRAIN_WORLD_SIZE 12000.0f
+#define TERRAIN_SIZE 513
+void Engine::configureTerrainDefaults(Ogre::Light *light)
+{
+    // Configure global
+    mTerrainGlobals->setMaxPixelError(8);
+    // testing composite map
+    mTerrainGlobals->setCompositeMapDistance(3000);
+
+    // Important to set these so that the terrain knows what to use for derived (non-realtime) data
+    mTerrainGlobals->setLightMapDirection(light->getDerivedDirection());
+    mTerrainGlobals->setCompositeMapAmbient(mSceneMgr->getAmbientLight());
+    mTerrainGlobals->setCompositeMapDiffuse(light->getDiffuseColour());
+
+    // Configure default import settings for if we use imported image
+    Ogre::Terrain::ImportData &defaultimp = mTerrainGroup->getDefaultImportSettings();
+    defaultimp.terrainSize = TERRAIN_SIZE;
+    defaultimp.worldSize = TERRAIN_WORLD_SIZE;
+    defaultimp.inputScale = 600;
+    defaultimp.minBatchSize = 33;
+    defaultimp.maxBatchSize = 65;
+    // textures
+    defaultimp.layerList.resize(3);
+    defaultimp.layerList[0].worldSize = 100;
+    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_diffusespecular.dds");
+    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_normalheight.dds");
+    defaultimp.layerList[1].worldSize = 30;
+    defaultimp.layerList[1].textureNames.push_back("grass_green-01_diffusespecular.dds");
+    defaultimp.layerList[1].textureNames.push_back("grass_green-01_normalheight.dds");
+    defaultimp.layerList[2].worldSize = 200;
+    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_diffusespecular.dds");
+    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_normalheight.dds");
+}
+
+void Engine::defineTerrain(long x, long y)
+{
+    Ogre::String filename = mTerrainGroup->generateFilename(x, y);
+    if(Ogre::ResourceGroupManager::getSingleton().resourceExists(mTerrainGroup->getResourceGroup(), filename))
+        mTerrainGroup->defineTerrain(x, y);
+    else
+    {
+        Ogre::Image img;
+        getTerrainImage((x&1) != 0, (y&1) != 0, img);
+        mTerrainGroup->defineTerrain(x, y, &img);
+        mTerrainsImported = true;
+    }
+}
+
+void Engine::getTerrainImage(bool flipX, bool flipY, Ogre::Image &img)
+{
+    img.load("terrain.png", "Textures");
+    if(flipX) img.flipAroundY();
+    if(flipY) img.flipAroundX();
+}
+
+void Engine::initBlendMaps(Ogre::Terrain *terrain)
+{
+    Ogre::TerrainLayerBlendMap *blendMap0 = terrain->getLayerBlendMap(1);
+    Ogre::TerrainLayerBlendMap *blendMap1 = terrain->getLayerBlendMap(2);
+    Ogre::Real minHeight0 = 70.0f;
+    Ogre::Real fadeDist0 = 40.0f;
+    Ogre::Real minHeight1 = 70.0f;
+    Ogre::Real fadeDist1 = 15.0f;
+    Ogre::uint16 blendMapSize = terrain->getLayerBlendMapSize();
+    float *pBlend0 = blendMap0->getBlendPointer();
+    float *pBlend1 = blendMap1->getBlendPointer();
+    for(Ogre::uint16 y = 0;y < blendMapSize;++y)
+    {
+        for(Ogre::uint16 x = 0;x < blendMapSize;++x)
+        {
+            Ogre::Real tx, ty;
+
+            blendMap0->convertImageToTerrainSpace(x, y, &tx, &ty);
+            Ogre::Real height = terrain->getHeightAtTerrainPosition(tx, ty);
+            Ogre::Real val = (height - minHeight0) / fadeDist0;
+            val = Ogre::Math::Clamp(val, 0.0f, 1.0f);
+            *pBlend0++ = val;
+
+            val = (height - minHeight1) / fadeDist1;
+            val = Ogre::Math::Clamp(val, 0.0f, 1.0f);
+            *pBlend1++ = val;
+        }
+    }
+    blendMap0->dirty();
+    blendMap1->dirty();
+    blendMap0->update();
+    blendMap1->update();
+}
+
+
 bool Engine::go(void)
 {
     // Kindly ask SDL not to trash our OGL context
@@ -267,8 +396,9 @@ bool Engine::go(void)
     // Init everything except audio (we will use OpenAL for that)
     if(SDL_Init(SDL_INIT_EVERYTHING & ~SDL_INIT_AUDIO) != 0)
     {
-        std::cerr<< "SDL_Init Error: "<<SDL_GetError() <<std::endl;
-        return false;
+        std::stringstream sstr;
+        sstr<< "SDL_Init Error: "<<SDL_GetError();
+        throw std::runtime_error(sstr.str());
     }
 
     // Construct Ogre::Root
@@ -306,6 +436,7 @@ bool Engine::go(void)
         resGrpMgr.createResourceGroup("Materials");
         resGrpMgr.createResourceGroup("Textures");
         resGrpMgr.createResourceGroup("Meshes");
+        resGrpMgr.createResourceGroup("Terrain");
 
         // Load resource paths from config file
         Ogre::ConfigFile cf;
@@ -343,18 +474,22 @@ bool Engine::go(void)
     ShaderGeneratorTechniqueResolverListener sgtrl;
     Ogre::MaterialManager::getSingleton().addListener(&sgtrl);
 
-    /* Initialise all resource groups. Ogre is sensitive to the shaders being
+    /* Initialize all resource groups. Ogre is sensitive to the shaders being
      * initialized after the materials, so ensure the shaders get initialized
      * first. */
     Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Shaders");
     Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Materials");
     Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
 
+#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
     const size_t numThreads = std::max(1u, Ogre::PlatformInformation::getNumLogicalCores());
     Ogre::InstancingTheadedCullingMethod threadedCullingMethod = Ogre::INSTANCING_CULLING_SINGLETHREAD;
     if(numThreads > 1)
         threadedCullingMethod = Ogre::INSTANCING_CULLING_THREADED;
     mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC, numThreads, threadedCullingMethod);
+#else
+    mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC);
+#endif
 
     {
         auto &shaderGenerator = Ogre::RTShader::ShaderGenerator::getSingleton();
@@ -371,23 +506,75 @@ bool Engine::go(void)
     }
 
     mCamera = mSceneMgr->createCamera("PlayerCam");
-    //mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(mCamera);
+#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
     mRoot->getCompositorManager2()->addWorkspace(
         mSceneMgr, mWindow, mCamera, "MainWorkspace", true
     );
+#else
+    mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(mCamera);
+    mViewport = mWindow->addViewport(mCamera);
+    mViewport->setMaterialScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
+#endif
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
+    mCamera->setPosition(Ogre::Vector3(1683.0f, 50.0f, 2116.0f));
+    mCamera->setNearClipDistance(1.0f);
+    mCamera->setFarClipDistance(50000.0f);
+    if(mRoot->getRenderSystem()->getCapabilities()->hasCapability(Ogre::RSC_INFINITE_FAR_PLANE))
+        mCamera->setFarClipDistance(0.0f);   // enable infinite far clip distance if we can
 
-    /* Create something simple to look at */
-    Ogre::Entity *ent = mSceneMgr->createEntity("penguin.mesh");
-    mSceneMgr->getRootSceneNode()->createChildSceneNode(Ogre::SCENE_DYNAMIC, Ogre::Vector3(0,0,-250))->attachObject(ent);
-
-    /* Make a light so we can see what we're looking at */
-    mSceneMgr->setAmbientLight(Ogre::ColourValue(0.3, 0.3, 0.3));
+    /* Make a light so we can see things */
+    mSceneMgr->setAmbientLight(Ogre::ColourValue(0.2, 0.2, 0.2));
     Ogre::SceneNode *lightNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-    lightNode->setPosition(20, 80, 50);
-    lightNode->attachObject(mSceneMgr->createLight());
+    Ogre::Light *l = mSceneMgr->createLight();
+    lightNode->attachObject(l);
+    l->setType(Ogre::Light::LT_DIRECTIONAL);
+    l->setDirection(Ogre::Vector3(0.55f, -0.3f, 0.75f).normalisedCopy());
+    l->setDiffuseColour(Ogre::ColourValue::White);
+    l->setSpecularColour(Ogre::ColourValue(0.4, 0.4, 0.4));
+
+    // Set up the terrain
+    {
+        mTerrainGlobals = OGRE_NEW Ogre::TerrainGlobalOptions();
+
+        // Bugfix for D3D11 Render System because of pixel format incompatibility when using
+        // vertex compression
+        if(mRoot->getRenderSystem()->getName() == "Direct3D11 Rendering Subsystem")
+            mTerrainGlobals->setUseVertexCompressionWhenAvailable(false);
+
+        mTerrainGroup = OGRE_NEW Ogre::TerrainGroup(mSceneMgr, Ogre::Terrain::ALIGN_X_Z, TERRAIN_SIZE, TERRAIN_WORLD_SIZE);
+        mTerrainGroup->setFilenameConvention("tkworld", "terrain");
+        mTerrainGroup->setOrigin(Ogre::Vector3::ZERO);
+        mTerrainGroup->setResourceGroup("Terrain");
+
+#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
+        mSceneMgr->updateSceneGraph();
+#endif
+
+        configureTerrainDefaults(l);
+
+        for(long x = 0;x < 2;++x)
+        {
+            for(long y = 0;y < 2;++y)
+                defineTerrain(x, y);
+        }
+
+        // sync load since we want everything in place when we start
+        mTerrainGroup->loadAllTerrains(true);
+
+        if(mTerrainsImported)
+        {
+            Ogre::TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
+            while(ti.hasMoreElements())
+            {
+                Ogre::Terrain *t = ti.getNext()->instance;
+                initBlendMaps(t);
+            }
+        }
+
+        mTerrainGroup->freeTemporaryResources();
+    }
 
     // And away we go!
     mRoot->addFrameListener(this);
@@ -405,6 +592,46 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     const Uint8 *keystate = SDL_GetKeyboardState(NULL);
     if(keystate[SDL_SCANCODE_ESCAPE])
         return false;
+
+    Ogre::Vector3 movedir(0.0f);
+    Ogre::Real speed = 60.0f * evt.timeSinceLastFrame;
+    if(keystate[SDL_SCANCODE_LSHIFT])
+        speed *= 2.0f;
+
+    if(keystate[SDL_SCANCODE_W])
+        movedir.z += -1.0f;
+    if(keystate[SDL_SCANCODE_A])
+        movedir.x += -1.0f;
+    if(keystate[SDL_SCANCODE_S])
+        movedir.z += +1.0f;
+    if(keystate[SDL_SCANCODE_D])
+        movedir.x += +1.0f;
+
+    Ogre::Vector3 pos = mCamera->getPosition();
+    Ogre::Quaternion ori = mCamera->getDerivedOrientation();
+    pos += (ori*movedir)*speed;
+    pos.y = std::max(pos.y, mTerrainGroup->getHeightAtWorldPosition(pos)+60.0f);
+    mCamera->setPosition(pos);
+
+    if(mTerrainGroup->isDerivedDataUpdateInProgress())
+    {
+        if(mTerrainsImported)
+        {
+            //mInfoLabel->setCaption("Building terrain, please wait...");
+        }
+        else
+        {
+            //mInfoLabel->setCaption("Updating textures, patience...");
+        }
+    }
+    else
+    {
+        if (mTerrainsImported)
+        {
+            //saveTerrains(true);
+            mTerrainsImported = false;
+        }
+    }
 
     return true;
 }

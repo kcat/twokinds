@@ -1,6 +1,5 @@
 [General]
 path=${DATA_ROOT}/RTShaderLib.zip
-path=${DATA_ROOT}/penguin.zip
 path=${DATA_ROOT}
 
 [Shaders]
