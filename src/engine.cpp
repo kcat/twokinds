@@ -16,10 +16,12 @@
 #include <OgreSceneNode.h>
 #include <OgreTechnique.h>
 #include <OgreConfigFile.h>
+#include <OgrePageManager.h>
 
 #include <OgreTerrain.h>
 #include <OgreTerrainGroup.h>
-#include <OgreTerrainMaterialGeneratorA.h>
+#include <OgreTerrainPaging.h>
+#include <OgreTerrainPagedWorldSection.h>
 
 #include <OgreRTShaderSystem.h>
 
@@ -32,6 +34,7 @@
 #include <SDL_syswm.h>
 
 #include "archives/physfs.hpp"
+#include "terrain.hpp"
 
 
 namespace
@@ -111,17 +114,32 @@ Engine::Engine(void)
   , mViewport(nullptr)
   , mTerrainGroup(nullptr)
   , mTerrainGlobals(nullptr)
-  , mTerrainsImported(false)
+  , mPageManager(nullptr)
+  , mTerrainPaging(nullptr)
+  , mTerrainSection(nullptr)
+  , mPageProvider(nullptr)
 {
 }
 
 Engine::~Engine(void)
 {
-    OGRE_DELETE mTerrainGroup;
+    if(mTerrainPaging)
+    {
+        OGRE_DELETE mTerrainPaging;
+        mTerrainPaging = nullptr;
+        OGRE_DELETE mPageManager;
+        mPageManager = nullptr;
+    }
+    else
+        OGRE_DELETE mTerrainGroup;
     mTerrainGroup = nullptr;
+    mTerrainSection = nullptr;
 
     OGRE_DELETE mTerrainGlobals;
     mTerrainGlobals = nullptr;
+
+    OGRE_DELETE mPageProvider;
+    mPageProvider = nullptr;
 
     if(mRoot)
     {
@@ -332,61 +350,6 @@ void Engine::configureTerrainDefaults(Ogre::Light *light)
     defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_normalheight.dds");
 }
 
-void Engine::defineTerrain(long x, long y)
-{
-    Ogre::String filename = mTerrainGroup->generateFilename(x, y);
-    if(Ogre::ResourceGroupManager::getSingleton().resourceExists(mTerrainGroup->getResourceGroup(), filename))
-        mTerrainGroup->defineTerrain(x, y);
-    else
-    {
-        Ogre::Image img;
-        getTerrainImage((x&1) != 0, (y&1) != 0, img);
-        mTerrainGroup->defineTerrain(x, y, &img);
-        mTerrainsImported = true;
-    }
-}
-
-void Engine::getTerrainImage(bool flipX, bool flipY, Ogre::Image &img)
-{
-    img.load("terrain.png", "Textures");
-    if(flipX) img.flipAroundY();
-    if(flipY) img.flipAroundX();
-}
-
-void Engine::initBlendMaps(Ogre::Terrain *terrain)
-{
-    Ogre::TerrainLayerBlendMap *blendMap0 = terrain->getLayerBlendMap(1);
-    Ogre::TerrainLayerBlendMap *blendMap1 = terrain->getLayerBlendMap(2);
-    Ogre::Real minHeight0 = 70.0f;
-    Ogre::Real fadeDist0 = 40.0f;
-    Ogre::Real minHeight1 = 70.0f;
-    Ogre::Real fadeDist1 = 15.0f;
-    Ogre::uint16 blendMapSize = terrain->getLayerBlendMapSize();
-    float *pBlend0 = blendMap0->getBlendPointer();
-    float *pBlend1 = blendMap1->getBlendPointer();
-    for(Ogre::uint16 y = 0;y < blendMapSize;++y)
-    {
-        for(Ogre::uint16 x = 0;x < blendMapSize;++x)
-        {
-            Ogre::Real tx, ty;
-
-            blendMap0->convertImageToTerrainSpace(x, y, &tx, &ty);
-            Ogre::Real height = terrain->getHeightAtTerrainPosition(tx, ty);
-            Ogre::Real val = (height - minHeight0) / fadeDist0;
-            val = Ogre::Math::Clamp(val, 0.0f, 1.0f);
-            *pBlend0++ = val;
-
-            val = (height - minHeight1) / fadeDist1;
-            val = Ogre::Math::Clamp(val, 0.0f, 1.0f);
-            *pBlend1++ = val;
-        }
-    }
-    blendMap0->dirty();
-    blendMap1->dirty();
-    blendMap0->update();
-    blendMap1->update();
-}
-
 
 bool Engine::go(void)
 {
@@ -554,24 +517,19 @@ bool Engine::go(void)
 
         configureTerrainDefaults(l);
 
-        for(long x = 0;x < 2;++x)
-        {
-            for(long y = 0;y < 2;++y)
-                defineTerrain(x, y);
-        }
-
-        // sync load since we want everything in place when we start
-        mTerrainGroup->loadAllTerrains(true);
-
-        if(mTerrainsImported)
-        {
-            Ogre::TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
-            while(ti.hasMoreElements())
-            {
-                Ogre::Terrain *t = ti.getNext()->instance;
-                initBlendMaps(t);
-            }
-        }
+        // Paging setup
+        mPageManager = OGRE_NEW Ogre::PageManager();
+        mPageProvider = OGRE_NEW TerrainPageProvider();
+        // Since we're not loading any pages from .page files, we need a way just
+        // to say we've loaded them without them actually being loaded
+        mPageManager->setPageProvider(mPageProvider);
+        mPageManager->addCamera(mCamera);
+        mTerrainPaging = OGRE_NEW Ogre::TerrainPaging(mPageManager);
+        Ogre::PagedWorld *world = mPageManager->createWorld();
+        mTerrainSection = mTerrainPaging->createWorldSection(world, mTerrainGroup, 2000, 3000,
+            -1, -1, 0, 0
+        );
+        mTerrainSection->setDefiner(OGRE_NEW SimpleTerrainDefiner());
 
         mTerrainGroup->freeTemporaryResources();
     }
@@ -615,22 +573,7 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
 
     if(mTerrainGroup->isDerivedDataUpdateInProgress())
     {
-        if(mTerrainsImported)
-        {
-            //mInfoLabel->setCaption("Building terrain, please wait...");
-        }
-        else
-        {
-            //mInfoLabel->setCaption("Updating textures, patience...");
-        }
-    }
-    else
-    {
-        if (mTerrainsImported)
-        {
-            //saveTerrains(true);
-            mTerrainsImported = false;
-        }
+        //mInfoLabel->setCaption("Updating textures, patience...");
     }
 
     return true;

@@ -12,16 +12,21 @@ namespace Ogre
     class Root;
     class RenderWindow;
     class SceneManager;
+    class PageManager;
     class Light;
     class Camera;
     class Viewport;
     class Terrain;
     class TerrainGroup;
+    class TerrainPaging;
+    class TerrainPagedWorldSection;
     class TerrainGlobalOptions;
 }
 
 namespace TK
 {
+
+class TerrainPageProvider;
 
 class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 {
@@ -33,18 +38,18 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::Camera *mCamera;
     Ogre::Viewport *mViewport; // Not used with Ogre 2.0!
 
-    Ogre::TerrainGroup  *mTerrainGroup;
+    Ogre::TerrainGroup *mTerrainGroup;
     Ogre::TerrainGlobalOptions *mTerrainGlobals;
-    bool mTerrainsImported;
+    Ogre::PageManager *mPageManager;
+    Ogre::TerrainPaging *mTerrainPaging;
+    Ogre::TerrainPagedWorldSection *mTerrainSection;
+    TerrainPageProvider *mPageProvider;
 
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
     bool pumpEvents();
 
-    void getTerrainImage(bool flipX, bool flipY, Ogre::Image &img);
-    void defineTerrain(long x, long y);
-    void initBlendMaps(Ogre::Terrain *terrain);
     void configureTerrainDefaults(Ogre::Light *light);
 
     virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);

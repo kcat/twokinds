@@ -97,10 +97,12 @@ configure_file("${twokinds_SOURCE_DIR}/resources.cfg.in"
 
 
 set(HDRS src/archives/physfs.hpp
+         src/terrain.hpp
          src/engine.hpp
 )
 
 set(SRCS src/archives/physfs.cpp
+         src/terrain.cpp
          src/engine.cpp
          main.cpp
 )
