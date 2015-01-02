@@ -16,12 +16,6 @@
 #include <OgreSceneNode.h>
 #include <OgreTechnique.h>
 #include <OgreConfigFile.h>
-#include <OgrePageManager.h>
-
-#include <OgreTerrain.h>
-#include <OgreTerrainGroup.h>
-#include <OgreTerrainPaging.h>
-#include <OgreTerrainPagedWorldSection.h>
 
 #include <OgreRTShaderSystem.h>
 
@@ -112,34 +106,12 @@ Engine::Engine(void)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
   , mViewport(nullptr)
-  , mTerrainGroup(nullptr)
-  , mTerrainGlobals(nullptr)
-  , mPageManager(nullptr)
-  , mTerrainPaging(nullptr)
-  , mTerrainSection(nullptr)
-  , mPageProvider(nullptr)
 {
 }
 
 Engine::~Engine(void)
 {
-    if(mTerrainPaging)
-    {
-        OGRE_DELETE mTerrainPaging;
-        mTerrainPaging = nullptr;
-        OGRE_DELETE mPageManager;
-        mPageManager = nullptr;
-    }
-    else
-        OGRE_DELETE mTerrainGroup;
-    mTerrainGroup = nullptr;
-    mTerrainSection = nullptr;
-
-    OGRE_DELETE mTerrainGlobals;
-    mTerrainGlobals = nullptr;
-
-    OGRE_DELETE mPageProvider;
-    mPageProvider = nullptr;
+    Terrain::get().deinitialize();
 
     if(mRoot)
     {
@@ -316,41 +288,6 @@ bool Engine::pumpEvents()
 }
 
 
-#define TERRAIN_WORLD_SIZE 12000.0f
-#define TERRAIN_SIZE 513
-void Engine::configureTerrainDefaults(Ogre::Light *light)
-{
-    // Configure global
-    mTerrainGlobals->setMaxPixelError(8);
-    // testing composite map
-    mTerrainGlobals->setCompositeMapDistance(3000);
-
-    // Important to set these so that the terrain knows what to use for derived (non-realtime) data
-    mTerrainGlobals->setLightMapDirection(light->getDerivedDirection());
-    mTerrainGlobals->setCompositeMapAmbient(mSceneMgr->getAmbientLight());
-    mTerrainGlobals->setCompositeMapDiffuse(light->getDiffuseColour());
-
-    // Configure default import settings for if we use imported image
-    Ogre::Terrain::ImportData &defaultimp = mTerrainGroup->getDefaultImportSettings();
-    defaultimp.terrainSize = TERRAIN_SIZE;
-    defaultimp.worldSize = TERRAIN_WORLD_SIZE;
-    defaultimp.inputScale = 600;
-    defaultimp.minBatchSize = 33;
-    defaultimp.maxBatchSize = 65;
-    // textures
-    defaultimp.layerList.resize(3);
-    defaultimp.layerList[0].worldSize = 100;
-    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_diffusespecular.dds");
-    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_normalheight.dds");
-    defaultimp.layerList[1].worldSize = 30;
-    defaultimp.layerList[1].textureNames.push_back("grass_green-01_diffusespecular.dds");
-    defaultimp.layerList[1].textureNames.push_back("grass_green-01_normalheight.dds");
-    defaultimp.layerList[2].worldSize = 200;
-    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_diffusespecular.dds");
-    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_normalheight.dds");
-}
-
-
 bool Engine::go(void)
 {
     // Kindly ask SDL not to trash our OGL context
@@ -498,41 +435,7 @@ bool Engine::go(void)
     l->setSpecularColour(Ogre::ColourValue(0.4, 0.4, 0.4));
 
     // Set up the terrain
-    {
-        mTerrainGlobals = OGRE_NEW Ogre::TerrainGlobalOptions();
-
-        // Bugfix for D3D11 Render System because of pixel format incompatibility when using
-        // vertex compression
-        if(mRoot->getRenderSystem()->getName() == "Direct3D11 Rendering Subsystem")
-            mTerrainGlobals->setUseVertexCompressionWhenAvailable(false);
-
-        mTerrainGroup = OGRE_NEW Ogre::TerrainGroup(mSceneMgr, Ogre::Terrain::ALIGN_X_Z, TERRAIN_SIZE, TERRAIN_WORLD_SIZE);
-        mTerrainGroup->setFilenameConvention("tkworld", "terrain");
-        mTerrainGroup->setOrigin(Ogre::Vector3::ZERO);
-        mTerrainGroup->setResourceGroup("Terrain");
-
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-        mSceneMgr->updateSceneGraph();
-#endif
-
-        configureTerrainDefaults(l);
-
-        // Paging setup
-        mPageManager = OGRE_NEW Ogre::PageManager();
-        mPageProvider = OGRE_NEW TerrainPageProvider();
-        // Since we're not loading any pages from .page files, we need a way just
-        // to say we've loaded them without them actually being loaded
-        mPageManager->setPageProvider(mPageProvider);
-        mPageManager->addCamera(mCamera);
-        mTerrainPaging = OGRE_NEW Ogre::TerrainPaging(mPageManager);
-        Ogre::PagedWorld *world = mPageManager->createWorld();
-        mTerrainSection = mTerrainPaging->createWorldSection(world, mTerrainGroup, 2000, 3000,
-            -1, -1, 0, 0
-        );
-        mTerrainSection->setDefiner(OGRE_NEW SimpleTerrainDefiner());
-
-        mTerrainGroup->freeTemporaryResources();
-    }
+    Terrain::get().initialize(mCamera, l);
 
     // And away we go!
     mRoot->addFrameListener(this);
@@ -565,13 +468,14 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     if(keystate[SDL_SCANCODE_D])
         movedir.x += +1.0f;
 
+    Ogre::TerrainGroup *tgroup = Terrain::get().getTerrainGroup();
     Ogre::Vector3 pos = mCamera->getPosition();
     Ogre::Quaternion ori = mCamera->getDerivedOrientation();
     pos += (ori*movedir)*speed;
-    pos.y = std::max(pos.y, mTerrainGroup->getHeightAtWorldPosition(pos)+60.0f);
+    pos.y = std::max(pos.y, tgroup->getHeightAtWorldPosition(pos)+60.0f);
     mCamera->setPosition(pos);
 
-    if(mTerrainGroup->isDerivedDataUpdateInProgress())
+    if(tgroup->isDerivedDataUpdateInProgress())
     {
         //mInfoLabel->setCaption("Updating textures, patience...");
     }
