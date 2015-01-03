@@ -45,6 +45,7 @@ set(CMAKE_DEBUG_POSTFIX "_d")
 find_package(OGRE REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(PhysFS REQUIRED)
+find_package(libNoise REQUIRED)
 
 if(NOT OGRE_RTShaderSystem_FOUND)
     message(FATAL_ERROR "Failed to find Ogre RTShaderSystem component")
@@ -97,11 +98,13 @@ configure_file("${twokinds_SOURCE_DIR}/resources.cfg.in"
 
 
 set(HDRS src/archives/physfs.hpp
+         src/noiseutils/noiseutils.h
          src/terrain.hpp
          src/engine.hpp
 )
 
 set(SRCS src/archives/physfs.cpp
+         src/noiseutils/noiseutils.cpp
          src/terrain.cpp
          src/engine.cpp
          main.cpp
@@ -109,13 +112,23 @@ set(SRCS src/archives/physfs.cpp
 
 add_executable(twokinds ${SRCS} ${HDRS})
 set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
-             "${twokinds_SOURCE_DIR}/src"
-             ${OGRE_INCLUDE_DIRS}
-             ${OGRE_RTShaderSystem_INCLUDE_DIRS}
-             ${OGRE_Terrain_INCLUDE_DIRS}
-             ${OGRE_Paging_INCLUDE_DIRS}
-             ${SDL2_INCLUDE_DIR}
-             ${PHYSFS_INCLUDE_DIR})
-target_link_libraries(twokinds  ${OGRE_LIBRARIES} ${OGRE_RTShaderSystem_LIBRARIES} ${OGRE_Terrain_LIBRARIES} ${OGRE_Paging_LIBRARIES} ${SDL2_LIBRARY} ${PHYSFS_LIBRARY})
+    "${twokinds_SOURCE_DIR}/src"
+    ${OGRE_INCLUDE_DIRS}
+    ${OGRE_RTShaderSystem_INCLUDE_DIRS}
+    ${OGRE_Terrain_INCLUDE_DIRS}
+    ${OGRE_Paging_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIR}
+    ${PHYSFS_INCLUDE_DIR}
+    ${LIBNOISE_INCLUDE_DIRS}
+)
+target_link_libraries(twokinds
+    ${OGRE_LIBRARIES}
+    ${OGRE_RTShaderSystem_LIBRARIES}
+    ${OGRE_Terrain_LIBRARIES}
+    ${OGRE_Paging_LIBRARIES}
+    ${SDL2_LIBRARY}
+    ${PHYSFS_LIBRARY}
+    ${LIBNOISE_LIBRARIES}
+)
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)
