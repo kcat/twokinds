@@ -190,7 +190,7 @@ void TerrainDefiner::define(Ogre::TerrainGroup *terrainGroup, long x, long y)
     std::vector<float> pixels(mNoiseMap.GetWidth() * mNoiseMap.GetHeight());
     for(int py = 0;py < mNoiseMap.GetHeight();++py)
     {
-        const float *src = mNoiseMap.GetSlabPtr(py);
+        const float *src = mNoiseMap.GetConstSlabPtr(py);
         float *dst = &pixels[py*mNoiseMap.GetWidth()];
         for(int px = 0;px < mNoiseMap.GetWidth();++px)
             dst[px] = src[px]*0.5f + 0.5f;
