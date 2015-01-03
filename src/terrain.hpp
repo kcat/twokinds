@@ -1,6 +1,8 @@
 #ifndef TERRAIN_HPP
 #define TERRAIN_HPP
 
+#include "noiseutils/noiseutils.h"
+
 #include <OgrePageManager.h>
 #include <OgreTerrainPagedWorldSection.h>
 
@@ -12,9 +14,16 @@ namespace Ogre
 namespace TK
 {
 
-class SimpleTerrainDefiner : public Ogre::TerrainPagedWorldSection::TerrainDefiner
+class TerrainDefiner : public Ogre::TerrainPagedWorldSection::TerrainDefiner
 {
+    noise::module::Perlin mNoiseModule;
+
+    noise::utils::NoiseMap mHeightMap;
+    noise::utils::NoiseMapBuilderPlane mHeightMapBuilder;
+
 public:
+    TerrainDefiner();
+
     virtual void define(Ogre::TerrainGroup *terrainGroup, long x, long y);
 };
 

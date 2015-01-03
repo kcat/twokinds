@@ -9,17 +9,18 @@
 #include <OgreTerrainGroup.h>
 #include <OgreTerrainPaging.h>
 #include <OgreTerrainPagedWorldSection.h>
+#include <OgreLogManager.h>
 
 namespace TK
 {
 
-#define TERRAIN_WORLD_SIZE 12000.0f
-#define TERRAIN_SIZE 513
+#define TERRAIN_WORLD_SIZE 6000.0f
+#define TERRAIN_SIZE 257
 
 void Terrain::configureTerrainDefaults(Ogre::SceneManager *sceneMgr, Ogre::Light *light)
 {
     // Configure global
-    mTerrainGlobals->setMaxPixelError(8);
+    mTerrainGlobals->setMaxPixelError(4);
     // testing composite map
     mTerrainGlobals->setCompositeMapDistance(3000);
 
@@ -80,9 +81,9 @@ void Terrain::initialize(Ogre::Camera *camera, Ogre::Light *l)
     mTerrainPaging = OGRE_NEW Ogre::TerrainPaging(mPageManager);
     Ogre::PagedWorld *world = mPageManager->createWorld();
     mTerrainSection = mTerrainPaging->createWorldSection(world, mTerrainGroup, 2000, 3000,
-        -1, -1, 0, 0
+        -2, -2, 1, 1
     );
-    mTerrainSection->setDefiner(OGRE_NEW SimpleTerrainDefiner());
+    mTerrainSection->setDefiner(OGRE_NEW TerrainDefiner());
 
     mTerrainGroup->freeTemporaryResources();
 }
@@ -120,13 +121,31 @@ Terrain::Terrain()
 Terrain Terrain::sTerrain;
 
 
-void SimpleTerrainDefiner::define(Ogre::TerrainGroup *terrainGroup, long x, long y)
+TerrainDefiner::TerrainDefiner()
 {
-    Ogre::Image img;
-    img.load("terrain.png", "Textures");
-    if((x&1) != 0) img.flipAroundY();
-    if((y&1) != 0) img.flipAroundX();
-    terrainGroup->defineTerrain(x, y, &img);
+    mNoiseModule.SetFrequency(4);
+    mHeightMapBuilder.SetSourceModule(mNoiseModule);
+    mHeightMapBuilder.SetDestNoiseMap(mHeightMap);
+    mHeightMapBuilder.SetDestSize(TERRAIN_SIZE, TERRAIN_SIZE);
+}
+
+void TerrainDefiner::define(Ogre::TerrainGroup *terrainGroup, long x, long y)
+{
+    mHeightMapBuilder.SetBounds(
+        x, (x+1) + 1.0f/(TERRAIN_SIZE-1),
+        y, (y+1) + 1.0f/(TERRAIN_SIZE-1)
+    );
+    mHeightMapBuilder.Build();
+
+    std::vector<float> pixels(mHeightMap.GetWidth() * mHeightMap.GetHeight());
+    for(int py = 0;py < mHeightMap.GetHeight();++py)
+    {
+        const float *src = mHeightMap.GetSlabPtr(py);
+        float *dst = &pixels[py*mHeightMap.GetWidth()];
+        for(int px = 0;px < mHeightMap.GetWidth();++px)
+            dst[px] = src[px]*0.5f + 0.5f;
+    }
+    terrainGroup->defineTerrain(x, y, pixels.data());
 }
 
 
