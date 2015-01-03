@@ -121,9 +121,57 @@ Terrain::Terrain()
 Terrain Terrain::sTerrain;
 
 
+// This custom module allows us to provide image data as a source for other
+// libnoise modules (such as selectors).
+class ImageSrcModule : public noise::module::Module
+{
+    const Ogre::Image &mImage;
+    double mFrequency;
+
+public:
+    ImageSrcModule(const Ogre::Image &image)
+      : noise::module::Module(0), mImage(image), mFrequency(1.0)
+    { }
+
+    // Sets the number of samples per unit (default=1). Higher values
+    // effectively shrink the image.
+    void SetFrequency(double freq)
+    {
+        if(!(freq > 0.0 && freq < std::numeric_limits<double>::max()))
+            throw std::runtime_error("Invalid ImageSrcModule frequency");
+        mFrequency = freq;
+    }
+
+    double GetFrequency() const { return mFrequency; }
+
+    // No source modules
+    virtual int GetSourceModuleCount() const { return 0; }
+
+    virtual double GetValue(double x, double /*y*/, double z) const
+    {
+        // NOTE: X is west/east and Z is north/south (Y is up/down, but we
+        // don't bother with depth)
+        x *= mFrequency;
+        z *= mFrequency;
+
+        // Offset the image so 0 is the center
+        x += mImage.getWidth()/2.0;
+        z += mImage.getHeight()/2.0;
+
+        x = Ogre::Math::Clamp<double>(x, 0.0, mImage.getWidth()-1);
+        z = Ogre::Math::Clamp<double>(z, 0.0, mImage.getHeight()-1);
+
+        Ogre::ColourValue clr = mImage.getColourAt((size_t)x, (size_t)z, 0);
+        // The components are normalized to 0...1, while libnoise expects -1...+1.
+        return clr.r*2.0 - 1.0;
+    }
+};
+
+
 TerrainDefiner::TerrainDefiner()
 {
     mHeightmap.load("tk-heightmap.png", "Terrain");
+    mHeightmapModule.reset(new ImageSrcModule(mHeightmap));
 
     mNoiseModule.SetFrequency(4);
     mHeightMapBuilder.SetSourceModule(mNoiseModule);

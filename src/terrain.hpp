@@ -14,10 +14,13 @@ namespace Ogre
 namespace TK
 {
 
+class ImageSrcModule;
+
 class TerrainDefiner : public Ogre::TerrainPagedWorldSection::TerrainDefiner
 {
     Ogre::Image mHeightmap;
 
+    std::unique_ptr<ImageSrcModule> mHeightmapModule;
     noise::module::Perlin mNoiseModule;
 
     noise::utils::NoiseMap mNoiseMap;
