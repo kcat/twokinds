@@ -16,9 +16,11 @@ namespace TK
 
 class TerrainDefiner : public Ogre::TerrainPagedWorldSection::TerrainDefiner
 {
+    Ogre::Image mHeightmap;
+
     noise::module::Perlin mNoiseModule;
 
-    noise::utils::NoiseMap mHeightMap;
+    noise::utils::NoiseMap mNoiseMap;
     noise::utils::NoiseMapBuilderPlane mHeightMapBuilder;
 
 public:

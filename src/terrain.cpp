@@ -123,9 +123,11 @@ Terrain Terrain::sTerrain;
 
 TerrainDefiner::TerrainDefiner()
 {
+    mHeightmap.load("tk-heightmap.png", "Terrain");
+
     mNoiseModule.SetFrequency(4);
     mHeightMapBuilder.SetSourceModule(mNoiseModule);
-    mHeightMapBuilder.SetDestNoiseMap(mHeightMap);
+    mHeightMapBuilder.SetDestNoiseMap(mNoiseMap);
     mHeightMapBuilder.SetDestSize(TERRAIN_SIZE, TERRAIN_SIZE);
 }
 
@@ -137,12 +139,12 @@ void TerrainDefiner::define(Ogre::TerrainGroup *terrainGroup, long x, long y)
     );
     mHeightMapBuilder.Build();
 
-    std::vector<float> pixels(mHeightMap.GetWidth() * mHeightMap.GetHeight());
-    for(int py = 0;py < mHeightMap.GetHeight();++py)
+    std::vector<float> pixels(mNoiseMap.GetWidth() * mNoiseMap.GetHeight());
+    for(int py = 0;py < mNoiseMap.GetHeight();++py)
     {
-        const float *src = mHeightMap.GetSlabPtr(py);
-        float *dst = &pixels[py*mHeightMap.GetWidth()];
-        for(int px = 0;px < mHeightMap.GetWidth();++px)
+        const float *src = mNoiseMap.GetSlabPtr(py);
+        float *dst = &pixels[py*mNoiseMap.GetWidth()];
+        for(int px = 0;px < mNoiseMap.GetWidth();++px)
             dst[px] = src[px]*0.5f + 0.5f;
     }
     terrainGroup->defineTerrain(x, y, pixels.data());

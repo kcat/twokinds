@@ -3,6 +3,7 @@ path=${DATA_ROOT}/RTShaderLib.zip
 path=${DATA_ROOT}
 
 [Shaders]
+path=/RTShaderLib/HLSL
 path=/RTShaderLib/GLSL150
 
 [Materials]
@@ -11,6 +12,9 @@ path=/materials/scripts
 
 [Textures]
 path=/materials/textures
+
+[Terrain]
+path=/terrain
 
 [Meshes]
 path=/meshes
