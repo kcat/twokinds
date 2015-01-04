@@ -125,6 +125,7 @@ Terrain Terrain::sTerrain;
 // libnoise modules (such as selectors).
 class ImageSrcModule : public noise::module::Module
 {
+protected:
     const Ogre::Image &mImage;
     double mFrequency;
 
@@ -149,8 +150,8 @@ public:
 
     virtual double GetValue(double x, double /*y*/, double z) const
     {
-        size_t width = mImage.getWidth();
-        size_t height = mImage.getHeight();
+        const size_t width = mImage.getWidth();
+        const size_t height = mImage.getHeight();
 
         // NOTE: X is west/east and Z is north/south (Y is up/down, but we
         // don't bother with depth)
@@ -161,8 +162,35 @@ public:
         x += width/2.0;
         z += height/2.0;
 
-        x = size_t(Ogre::Math::Clamp<double>(x, 0.0, width-1));
-        z = size_t(Ogre::Math::Clamp<double>(z, 0.0, height-1));
+        x = Ogre::Math::Clamp<double>(x, 0.0, width-1);
+        z = Ogre::Math::Clamp<double>(z, 0.0, height-1);
+
+        size_t sx = size_t(x);
+        size_t sy = size_t(z);
+
+        // The components are normalized to 0...1, while libnoise expects -1...+1.
+        Ogre::ColourValue clr = mImage.getColourAt(sx, sy, 0);
+        return clr.r*2.0 - 1.0;
+    }
+};
+
+class ImageInterpSrcModule : public ImageSrcModule
+{
+public:
+    ImageInterpSrcModule(const Ogre::Image &image)
+      : ImageSrcModule(image)
+    { }
+
+    virtual double GetValue(double x, double /*y*/, double z) const
+    {
+        size_t width = mImage.getWidth();
+        size_t height = mImage.getHeight();
+
+        x = x*mFrequency + width/2.0;
+        z = z*mFrequency + height/2.0;
+
+        x = Ogre::Math::Clamp<double>(x, 0.0, width-1);
+        z = Ogre::Math::Clamp<double>(z, 0.0, height-1);
 
         size_t sx = size_t(x);
         size_t sy = size_t(z);
@@ -189,7 +217,7 @@ public:
 TerrainDefiner::TerrainDefiner()
 {
     mHeightmap.load("tk-heightmap.png", "Terrain");
-    mHeightmapModule.reset(new ImageSrcModule(mHeightmap));
+    mHeightmapModule.reset(new ImageInterpSrcModule(mHeightmap));
 
     mNoiseModule.SetFrequency(4);
     mHeightMapBuilder.SetSourceModule(mNoiseModule);
