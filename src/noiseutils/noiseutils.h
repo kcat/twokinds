@@ -2496,9 +2496,11 @@ namespace noise
         /// Calculates the normal vector at a given point on the noise map.
         ///
         /// @param nc The height of the given point in the noise map.
-        /// @param nr The height of the left neighbor.
+        /// @param nr The height of the right neighbor.
         /// @param nu The height of the up neighbor.
-        /// @param bumpHeight The bump height.
+        /// @param nl The height of the left neighbor.
+        /// @param nd The height of the down neighbor.
+        /// @param bumpHeight The bump height factor.
         ///
         /// @returns The normal vector represented as a color.
         ///
@@ -2514,8 +2516,8 @@ namespace noise
         /// 
         /// The spatial resolution and elevation resolution are determined by
         /// the application.
-        Color CalcNormalColor (double nc, double nr, double nu,
-          double bumpHeight) const;
+        static Color CalcNormalColor (double nc, double nr, double nu, double nl, double nd,
+                                      double bumpHeight);
 
         /// The bump height for the normal map.
         double m_bumpHeight;

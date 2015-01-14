@@ -1198,18 +1198,15 @@ RendererNormalMap::RendererNormalMap ():
 {
 };
 
-Color RendererNormalMap::CalcNormalColor (double nc, double nr, double nu,
-  double bumpHeight) const
+Color RendererNormalMap::CalcNormalColor (double nc, double nr, double nu, double nl, double nd,
+  double bumpHeight)
 {
   // Calculate the surface normal.
-  nc *= bumpHeight;
-  nr *= bumpHeight;
-  nu *= bumpHeight;
-  double ncr = (nc - nr);
-  double ncu = (nc - nu);
-  double d = sqrt ((ncu * ncu) + (ncr * ncr) + 1);
-  double vxc = (nc - nr) / d;
-  double vyc = (nc - nu) / d;
+  double ncr = ((nc - nr) - (nc - nl)) * bumpHeight;
+  double ncu = ((nc - nu) - (nc - nd)) * bumpHeight;
+  double d = sqrt ((ncu * ncu) + (ncr * ncr) + 1.0);
+  double vxc = ncr / d;
+  double vyc = ncu / d;
   double vzc = 1.0 / d;
 
   // Map the normal range from the (-1.0 .. +1.0) range to the (0 .. 255)
@@ -1241,40 +1238,63 @@ void RendererNormalMap::Render ()
 
       // Calculate the positions of the current point's right and up
       // neighbors.
-      int xRightOffset, yUpOffset;
+      int xRightOffset, yUpOffset, xLeftOffset, yDownOffset;
       if (m_isWrapEnabled) {
-        if (x == (int)width - 1) {
-          xRightOffset = -((int)width - 1);
+        if (x == width - 1) {
+          xRightOffset = -(width - 1);
         } else {
           xRightOffset = 1;
         }
-        if (y == (int)height - 1) {
-          yUpOffset = -((int)height - 1);
+        if (x == 0) {
+          xLeftOffset = (width - 1);
+        } else {
+          xLeftOffset = -1;
+        }
+        if (y == height - 1) {
+          yUpOffset = -(height - 1);
         } else {
           yUpOffset = 1;
         }
+        if (y == 0) {
+          yDownOffset = (height - 1);
+        } else {
+          yDownOffset = -1;
+        }
       } else {
-        if (x == (int)width - 1) {
+        if (x == width - 1) {
           xRightOffset = 0;
         } else {
           xRightOffset = 1;
         }
-        if (y == (int)height - 1) {
+        if (x == 0) {
+          xLeftOffset = 0;
+        } else {
+          xLeftOffset = -1;
+        }
+        if (y == height - 1) {
           yUpOffset = 0;
         } else {
           yUpOffset = 1;
         }
+        if (y == 0) {
+          yDownOffset = 0;
+        } else {
+          yDownOffset = -1;
+        }
       }
       yUpOffset *= m_pSourceNoiseMap->GetStride ();
+      yDownOffset *= m_pSourceNoiseMap->GetStride ();
 
       // Get the noise value of the current point in the source noise map
       // and the noise values of its right and up neighbors.
       double nc = (double)(*pSource);
       double nr = (double)(*(pSource + xRightOffset));
       double nu = (double)(*(pSource + yUpOffset   ));
+      double nl = (double)(*(pSource + xLeftOffset ));
+      double nd = (double)(*(pSource + yDownOffset ));
 
       // Calculate the normal product.
-      *pDest = CalcNormalColor (nc, nr, nu, m_bumpHeight);
+      *pDest = CalcNormalColor (nc, nr, nu, nl, nd, m_bumpHeight);
 
       // Go to the next point.
       ++pSource;
