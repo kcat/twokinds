@@ -26,13 +26,19 @@ namespace TK
 class ImageSrcModule : public noise::module::Module
 {
 protected:
-    const Ogre::Image &mImage;
+    Ogre::Image mImage;
     double mFrequency;
 
 public:
-    ImageSrcModule(const Ogre::Image &image)
-      : noise::module::Module(0), mImage(image), mFrequency(1.0)
+    ImageSrcModule()
+      : noise::module::Module(0), mFrequency(1.0)
     { }
+
+    // Retrieves the source Image object.
+    Ogre::Image &GetImage() { return mImage; }
+
+    // Retrieves the source Image object.
+    const Ogre::Image &GetImage() const { return mImage; }
 
     // Sets the number of samples per unit (default=1). Higher values
     // effectively shrink the image.
@@ -78,9 +84,7 @@ public:
 class ImageInterpSrcModule : public ImageSrcModule
 {
 public:
-    ImageInterpSrcModule(const Ogre::Image &image)
-      : ImageSrcModule(image)
-    { }
+    ImageInterpSrcModule() { }
 
     virtual double GetValue(double x, double /*y*/, double z) const
     {
@@ -122,9 +126,7 @@ public:
 
 class TerrainStorage : public Terrain::Storage
 {
-    Ogre::Image mHeightmap;
-
-    std::unique_ptr<ImageSrcModule> mHeightmapModule;
+    ImageSrcModule mHeightmapModule;
 
     noise::module::Perlin mBaseFieldsTerrain;
     noise::module::ScaleBias mFieldsTerrain;
@@ -163,9 +165,8 @@ public:
 
 TerrainStorage::TerrainStorage()
 {
-    mHeightmap.load("tk-heightmap.png", "Terrain");
-    mHeightmapModule.reset(new ImageInterpSrcModule(mHeightmap));
-    mHeightmapModule->SetFrequency(32.0);
+    mHeightmapModule.GetImage().load("tk-heightmap.png", "Terrain");
+    mHeightmapModule.SetFrequency(32.0);
 
     float fields_base = 16.0f/255.0f * 2.0f - 1.0f;
     mBaseFieldsTerrain.SetFrequency(noise::module::DEFAULT_PERLIN_FREQUENCY * 2.0);
@@ -181,7 +182,7 @@ TerrainStorage::TerrainStorage()
     float edge_falloff = 8.0f/255.0f;
     mFinalTerrain.SetSourceModule(0, mSeaTerrain);
     mFinalTerrain.SetSourceModule(1, mFieldsTerrain);
-    mFinalTerrain.SetControlModule(*mHeightmapModule);
+    mFinalTerrain.SetControlModule(mHeightmapModule);
     mFinalTerrain.SetBounds(fields_base-edge_falloff, std::numeric_limits<double>::max());
     mFinalTerrain.SetEdgeFalloff(edge_falloff);
 }
@@ -189,10 +190,10 @@ TerrainStorage::TerrainStorage()
 void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& maxY)
 {
     /* FIXME: Use image size once large terrains properly work */
-    minX = -32;//-(int)mHeightmap.getWidth()/2;
-    minY = -32;//-(int)mHeightmap.getHeight()/2;
-    maxX =  32;//mHeightmap.getWidth()/2;
-    maxY =  32;//mHeightmap.getHeight()/2;
+    minX = -32;//-(int)mHeightmapModule.GetImage().getWidth()/2;
+    minY = -32;//-(int)mHeightmapModule.GetImage().getHeight()/2;
+    maxX =  32;//mHeightmapModule.GetImage().getWidth()/2;
+    maxY =  32;//mHeightmapModule.GetImage().getHeight()/2;
 }
 
 bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
