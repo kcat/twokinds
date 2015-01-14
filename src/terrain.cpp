@@ -115,7 +115,9 @@ public:
 };
 
 
+/* World size/height is just a placeholder for now. */
 #define TERRAIN_WORLD_SIZE 1500.0f
+#define TERRAIN_WORLD_HEIGHT 600.0f
 #define TERRAIN_SIZE 65
 
 class TerrainStorage : public Terrain::Storage
@@ -221,7 +223,8 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
 
     noise::utils::Image normalmap(output.GetWidth(), output.GetHeight());
     noise::utils::RendererNormalMap normrender;
-    normrender.SetBumpHeight(600.0f*0.5f / (TERRAIN_WORLD_SIZE / TERRAIN_SIZE));
+    /* *0.5f since libnoise goes from -1..+1, rather than 0..1 */
+    normrender.SetBumpHeight(TERRAIN_WORLD_HEIGHT*0.5f / (TERRAIN_WORLD_SIZE / TERRAIN_SIZE));
     normrender.SetSourceNoiseMap(output);
     normrender.SetDestImage(normalmap);
     normrender.Render();
@@ -240,7 +243,7 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
 
             positions[idx*3 + 0] = (px/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
             positions[idx*3 + 1] = (py/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
-            positions[idx*3 + 2] = (src[px]*0.5f + 0.5f) * 600.0f;
+            positions[idx*3 + 2] = (src[px]*0.5f + 0.5f) * TERRAIN_WORLD_HEIGHT;
             Terrain::convertPosition(align, positions[idx*3 + 0], positions[idx*3 + 1], positions[idx*3 + 2]);
 
             normals[idx*3 + 0] = norms[px].red/127.5f - 1.0f;
@@ -307,7 +310,7 @@ void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nod
 float TerrainStorage::getHeightAt(const Ogre::Vector3 &worldPos)
 {
     float val = mFinalTerrain.GetValue(worldPos.x / TERRAIN_WORLD_SIZE, 0.0f, worldPos.z / -TERRAIN_WORLD_SIZE);
-    return (val*0.5f + 0.5f) * 600.0f;
+    return (val*0.5f + 0.5f) * TERRAIN_WORLD_HEIGHT;
 }
 
 
