@@ -99,12 +99,29 @@ configure_file("${twokinds_SOURCE_DIR}/resources.cfg.in"
 
 set(HDRS src/archives/physfs.hpp
          src/noiseutils/noiseutils.h
+         src/terrain/buffercache.hpp
+         src/terrain/chunk.hpp
+         src/terrain/defaultworld.hpp
+         src/terrain/defs.hpp
+         src/terrain/material.hpp
+         src/terrain/quadtreenode.hpp
+         src/terrain/storage.hpp
+         src/terrain/terraingrid.hpp
+         src/terrain/world.hpp
          src/terrain.hpp
          src/engine.hpp
 )
 
 set(SRCS src/archives/physfs.cpp
          src/noiseutils/noiseutils.cpp
+         src/terrain/buffercache.cpp
+         src/terrain/chunk.cpp
+         src/terrain/defaultworld.cpp
+         src/terrain/material.cpp
+         src/terrain/quadtreenode.cpp
+         src/terrain/storage.cpp
+         src/terrain/terraingrid.cpp
+         src/terrain/world.cpp
          src/terrain.cpp
          src/engine.cpp
          main.cpp
