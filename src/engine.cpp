@@ -111,7 +111,7 @@ Engine::Engine(void)
 
 Engine::~Engine(void)
 {
-    Terrain::get().deinitialize();
+    World::get().deinitialize();
 
     if(mRoot)
     {
@@ -418,24 +418,23 @@ bool Engine::go(void)
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
-    mCamera->setPosition(Ogre::Vector3(1683.0f, 50.0f, 2116.0f));
+    mCamera->setPosition(Ogre::Vector3(0.0f, 0.0f, 0.0f));
     mCamera->setNearClipDistance(1.0f);
     mCamera->setFarClipDistance(50000.0f);
     if(mRoot->getRenderSystem()->getCapabilities()->hasCapability(Ogre::RSC_INFINITE_FAR_PLANE))
         mCamera->setFarClipDistance(0.0f);   // enable infinite far clip distance if we can
 
     /* Make a light so we can see things */
-    mSceneMgr->setAmbientLight(Ogre::ColourValue(0.2, 0.2, 0.2));
+    mSceneMgr->setAmbientLight(Ogre::ColourValue(137.0f/255.0f, 140.0f/255.0f, 160.0f/255.0f));
     Ogre::SceneNode *lightNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
     Ogre::Light *l = mSceneMgr->createLight();
     lightNode->attachObject(l);
     l->setType(Ogre::Light::LT_DIRECTIONAL);
     l->setDirection(Ogre::Vector3(0.55f, -0.3f, 0.75f).normalisedCopy());
-    l->setDiffuseColour(Ogre::ColourValue::White);
-    l->setSpecularColour(Ogre::ColourValue(0.4, 0.4, 0.4));
+    l->setDiffuseColour(Ogre::ColourValue(1.0f, 252.0f/255.0f, 238.0f/255.0f));
 
     // Set up the terrain
-    Terrain::get().initialize(mCamera, l);
+    World::get().initialize(mCamera, l);
 
     // And away we go!
     mRoot->addFrameListener(this);
@@ -444,6 +443,12 @@ bool Engine::go(void)
     return true;
 }
 
+
+bool Engine::frameStarted(const Ogre::FrameEvent &evt)
+{
+    World::get().update(mCamera->getPosition());
+    return true;
+}
 
 bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
 {
@@ -468,17 +473,11 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     if(keystate[SDL_SCANCODE_D])
         movedir.x += +1.0f;
 
-    Ogre::TerrainGroup *tgroup = Terrain::get().getTerrainGroup();
     Ogre::Vector3 pos = mCamera->getPosition();
     Ogre::Quaternion ori = mCamera->getDerivedOrientation();
     pos += (ori*movedir)*speed;
-    pos.y = std::max(pos.y, tgroup->getHeightAtWorldPosition(pos)+60.0f);
+    pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
     mCamera->setPosition(pos);
-
-    if(tgroup->isDerivedDataUpdateInProgress())
-    {
-        //mInfoLabel->setCaption("Updating textures, patience...");
-    }
 
     return true;
 }

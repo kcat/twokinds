@@ -38,6 +38,7 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     void handleWindowEvent(const SDL_WindowEvent &evt);
     bool pumpEvents();
 
+    virtual bool frameStarted(const Ogre::FrameEvent &evt);
     virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);
 
 public:

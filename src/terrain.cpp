@@ -11,115 +11,15 @@
 #include <OgreTerrainPagedWorldSection.h>
 #include <OgreLogManager.h>
 
+#include "noiseutils/noiseutils.h"
+
+#include "terrain/defaultworld.hpp"
+#include "terrain/storage.hpp"
+#include "terrain/quadtreenode.hpp"
+
+
 namespace TK
 {
-
-#define TERRAIN_WORLD_SIZE 6000.0f
-#define TERRAIN_SIZE 257
-
-void Terrain::configureTerrainDefaults(Ogre::SceneManager *sceneMgr, Ogre::Light *light)
-{
-    // Configure global
-    mTerrainGlobals->setMaxPixelError(4);
-    // testing composite map
-    mTerrainGlobals->setCompositeMapDistance(3000);
-
-    // Important to set these so that the terrain knows what to use for derived (non-realtime) data
-    mTerrainGlobals->setLightMapDirection(light->getDerivedDirection());
-    mTerrainGlobals->setCompositeMapAmbient(sceneMgr->getAmbientLight());
-    mTerrainGlobals->setCompositeMapDiffuse(light->getDiffuseColour());
-
-    // Configure default import settings for if we use imported image
-    Ogre::Terrain::ImportData &defaultimp = mTerrainGroup->getDefaultImportSettings();
-    defaultimp.terrainSize = TERRAIN_SIZE;
-    defaultimp.worldSize = TERRAIN_WORLD_SIZE;
-    defaultimp.inputScale = 600;
-    defaultimp.minBatchSize = 33;
-    defaultimp.maxBatchSize = 65;
-    // textures
-    defaultimp.layerList.resize(3);
-    defaultimp.layerList[0].worldSize = 100;
-    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_diffusespecular.dds");
-    defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_normalheight.dds");
-    defaultimp.layerList[1].worldSize = 30;
-    defaultimp.layerList[1].textureNames.push_back("grass_green-01_diffusespecular.dds");
-    defaultimp.layerList[1].textureNames.push_back("grass_green-01_normalheight.dds");
-    defaultimp.layerList[2].worldSize = 200;
-    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_diffusespecular.dds");
-    defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_normalheight.dds");
-}
-
-void Terrain::initialize(Ogre::Camera *camera, Ogre::Light *l)
-{
-    Ogre::SceneManager *sceneMgr = camera->getSceneManager();
-
-    mTerrainGlobals = OGRE_NEW Ogre::TerrainGlobalOptions();
-
-    // Bugfix for D3D11 Render System because of pixel format incompatibility when using
-    // vertex compression
-    if(Ogre::Root::getSingleton().getRenderSystem()->getName() == "Direct3D11 Rendering Subsystem")
-        mTerrainGlobals->setUseVertexCompressionWhenAvailable(false);
-
-    mTerrainGroup = OGRE_NEW Ogre::TerrainGroup(sceneMgr, Ogre::Terrain::ALIGN_X_Z, TERRAIN_SIZE, TERRAIN_WORLD_SIZE);
-    mTerrainGroup->setFilenameConvention("tkworld", "terrain");
-    mTerrainGroup->setOrigin(Ogre::Vector3::ZERO);
-    mTerrainGroup->setResourceGroup("Terrain");
-
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-    sceneMgr->updateSceneGraph();
-#endif
-
-    configureTerrainDefaults(sceneMgr, l);
-
-    // Paging setup
-    mPageManager = OGRE_NEW Ogre::PageManager();
-    mPageProvider = OGRE_NEW TerrainPageProvider();
-    // Since we're not loading any pages from .page files, we need a way just
-    // to say we've loaded them without them actually being loaded
-    mPageManager->setPageProvider(mPageProvider);
-    mPageManager->addCamera(camera);
-    mTerrainPaging = OGRE_NEW Ogre::TerrainPaging(mPageManager);
-    Ogre::PagedWorld *world = mPageManager->createWorld();
-    mTerrainSection = mTerrainPaging->createWorldSection(world, mTerrainGroup, 2000, 3000,
-        -2, -2, 1, 1
-    );
-    mTerrainSection->setDefiner(OGRE_NEW TerrainDefiner());
-
-    mTerrainGroup->freeTemporaryResources();
-}
-
-void Terrain::deinitialize()
-{
-    if(mTerrainPaging)
-    {
-        OGRE_DELETE mTerrainPaging;
-        mTerrainPaging = nullptr;
-        OGRE_DELETE mPageManager;
-        mPageManager = nullptr;
-    }
-    else
-        OGRE_DELETE mTerrainGroup;
-    mTerrainGroup = nullptr;
-    mTerrainSection = nullptr;
-
-    OGRE_DELETE mTerrainGlobals;
-    mTerrainGlobals = nullptr;
-
-    OGRE_DELETE mPageProvider;
-    mPageProvider = nullptr;
-}
-
-Terrain::Terrain()
-  : mTerrainGroup(nullptr)
-  , mTerrainGlobals(nullptr)
-  , mPageManager(nullptr)
-  , mTerrainPaging(nullptr)
-  , mTerrainSection(nullptr)
-  , mPageProvider(nullptr)
-{
-}
-Terrain Terrain::sTerrain;
-
 
 // This custom module allows us to provide image data as a source for other
 // libnoise modules (such as selectors).
@@ -174,6 +74,7 @@ public:
     }
 };
 
+// Same as above, except applies linear interpolation to the calculated height.
 class ImageInterpSrcModule : public ImageSrcModule
 {
 public:
@@ -214,40 +115,239 @@ public:
 };
 
 
-TerrainDefiner::TerrainDefiner()
+#define TERRAIN_WORLD_SIZE 1500.0f
+#define TERRAIN_SIZE 65
+
+class TerrainStorage : public Terrain::Storage
+{
+    Ogre::Image mHeightmap;
+
+    std::unique_ptr<ImageSrcModule> mHeightmapModule;
+
+    noise::module::Perlin mBaseFieldsTerrain;
+    noise::module::ScaleBias mFieldsTerrain;
+    noise::module::Billow mBaseSeaTerrain;
+    noise::module::ScaleBias mSeaTerrain;
+    noise::module::Select mFinalTerrain;
+
+public:
+    TerrainStorage();
+
+    virtual void getBounds(float& minX, float& maxX, float& minY, float& maxY);
+
+    virtual bool getMinMaxHeights(float size, const Ogre::Vector2 &center, float& min, float& max);
+
+    virtual void fillVertexBuffers(int lodLevel, float size, const Ogre::Vector2 &center, Terrain::Alignment align,
+                                   std::vector<float> &positions, std::vector<float> &normals,
+                                   std::vector<Ogre::uint8> &colours);
+
+    virtual void getBlendmaps(float chunkSize, const Ogre::Vector2 &chunkCenter, bool pack,
+                              std::vector<Ogre::PixelBox> &blendmaps,
+                              std::vector<Terrain::LayerInfo> &layerList);
+
+    virtual void getBlendmaps(const std::vector<Terrain::QuadTreeNode*> &nodes, std::vector<Terrain::LayerCollection> &out, bool pack);
+
+    virtual float getHeightAt(const Ogre::Vector3 &worldPos);
+
+    virtual Terrain::LayerInfo getDefaultLayer()
+    {
+        return Terrain::LayerInfo{"dirt_grayrocky_diffusespecular.dds", "dirt_grayrocky_normalheight.dds", false, false};
+    }
+
+    virtual float getCellWorldSize() { return TERRAIN_WORLD_SIZE; }
+
+    virtual int getCellVertices() { return TERRAIN_SIZE; }
+};
+
+TerrainStorage::TerrainStorage()
 {
     mHeightmap.load("tk-heightmap.png", "Terrain");
     mHeightmapModule.reset(new ImageInterpSrcModule(mHeightmap));
+    mHeightmapModule->SetFrequency(32.0);
 
-    mNoiseModule.SetFrequency(4);
-    mHeightMapBuilder.SetSourceModule(mNoiseModule);
-    mHeightMapBuilder.SetDestNoiseMap(mNoiseMap);
-    mHeightMapBuilder.SetDestSize(TERRAIN_SIZE, TERRAIN_SIZE);
+    float fields_base = 16.0f/255.0f * 2.0f - 1.0f;
+    mBaseFieldsTerrain.SetFrequency(noise::module::DEFAULT_PERLIN_FREQUENCY * 2.0);
+    mFieldsTerrain.SetSourceModule(0, mBaseFieldsTerrain);
+    mFieldsTerrain.SetScale(0.25);
+    mFieldsTerrain.SetBias(0.25 + fields_base);
+
+    mBaseSeaTerrain.SetFrequency(2.0 * 2.0);
+    mSeaTerrain.SetSourceModule(0, mBaseSeaTerrain);
+    mSeaTerrain.SetScale(0.0625);
+    mSeaTerrain.SetBias(-1.5);
+
+    float edge_falloff = 8.0f/255.0f;
+    mFinalTerrain.SetSourceModule(0, mSeaTerrain);
+    mFinalTerrain.SetSourceModule(1, mFieldsTerrain);
+    mFinalTerrain.SetControlModule(*mHeightmapModule);
+    mFinalTerrain.SetBounds(fields_base-edge_falloff, std::numeric_limits<double>::max());
+    mFinalTerrain.SetEdgeFalloff(edge_falloff);
 }
 
-void TerrainDefiner::define(Ogre::TerrainGroup *terrainGroup, long x, long y)
+void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& maxY)
 {
-    mHeightMapBuilder.SetBounds(
-        x, (x+1) + 1.0f/(TERRAIN_SIZE-1),
-        y, (y+1) + 1.0f/(TERRAIN_SIZE-1)
-    );
-    mHeightMapBuilder.Build();
+    /* FIXME: Use image size once large terrains properly work */
+    minX = -32;//-(int)mHeightmap.getWidth()/2;
+    minY = -32;//-(int)mHeightmap.getHeight()/2;
+    maxX =  32;//mHeightmap.getWidth()/2;
+    maxY =  32;//mHeightmap.getHeight()/2;
+}
 
-    std::vector<float> pixels(mNoiseMap.GetWidth() * mNoiseMap.GetHeight());
-    for(int py = 0;py < mNoiseMap.GetHeight();++py)
+bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
+{
+    min = -TERRAIN_WORLD_SIZE;
+    max =  TERRAIN_WORLD_SIZE;
+    return true;
+}
+
+void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vector2& center, Terrain::Alignment align,
+                                       std::vector<float>& positions, std::vector<float>& normals,
+                                       std::vector<Ogre::uint8>& colours)
+{
+    assert(size == 1<<lodLevel);
+
+    const float cell_vtx = 1.0f/((TERRAIN_SIZE-1)>>lodLevel);
+    noise::utils::NoiseMap output;
+    noise::utils::NoiseMapBuilderPlane builder;
+    builder.SetSourceModule(mFinalTerrain);
+    builder.SetDestNoiseMap(output);
+    // We need an extra rows and columns on the sides to calculate proper normals
+    builder.SetDestSize(TERRAIN_SIZE+2, TERRAIN_SIZE+2);
+    builder.SetBounds(
+        center.x-(size/2.0f) - cell_vtx, center.x+(size/2.0f) + 2.0f*cell_vtx,
+        center.y-(size/2.0f) - cell_vtx, center.y+(size/2.0f) + 2.0f*cell_vtx
+    );
+    builder.Build();
+
+    noise::utils::Image normalmap(output.GetWidth(), output.GetHeight());
+    noise::utils::RendererNormalMap normrender;
+    normrender.SetBumpHeight(600.0f*0.5f / (TERRAIN_WORLD_SIZE / TERRAIN_SIZE));
+    normrender.SetSourceNoiseMap(output);
+    normrender.SetDestImage(normalmap);
+    normrender.Render();
+
+    positions.resize(TERRAIN_SIZE*TERRAIN_SIZE * 3);
+    normals.resize(TERRAIN_SIZE*TERRAIN_SIZE * 3);
+    colours.resize(TERRAIN_SIZE*TERRAIN_SIZE * 4);
+
+    for(int py = 0;py < TERRAIN_SIZE;++py)
     {
-        const float *src = mNoiseMap.GetConstSlabPtr(py);
-        float *dst = &pixels[py*mNoiseMap.GetWidth()];
-        for(int px = 0;px < mNoiseMap.GetWidth();++px)
-            dst[px] = src[px]*0.5f + 0.5f;
+        const float *src = output.GetConstSlabPtr(py+1)+1;
+        const noise::utils::Color *norms = normalmap.GetConstSlabPtr(py+1)+1;
+        for(int px = 0;px < TERRAIN_SIZE;++px)
+        {
+            size_t idx = (px*TERRAIN_SIZE) + py;
+
+            positions[idx*3 + 0] = (px/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
+            positions[idx*3 + 1] = (py/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
+            positions[idx*3 + 2] = (src[px]*0.5f + 0.5f) * 600.0f;
+            Terrain::convertPosition(align, positions[idx*3 + 0], positions[idx*3 + 1], positions[idx*3 + 2]);
+
+            normals[idx*3 + 0] = norms[px].red/127.5f - 1.0f;
+            normals[idx*3 + 1] = norms[px].green/127.5f - 1.0f;
+            normals[idx*3 + 2] = norms[px].blue/127.5f - 1.0f;
+            Terrain::convertPosition(align, normals[idx*3 + 0], normals[idx*3 + 1], normals[idx*3 + 2]);
+
+            Ogre::ColourValue col(1.0f, 1.0f, 1.0f, 1.0f);
+            union {
+                Ogre::uint32 val32;
+                Ogre::uint8 val8[4];
+            } cvt_clr;
+            Ogre::Root::getSingleton().getRenderSystem()->convertColourValue(col, &cvt_clr.val32);
+            colours[idx*4 + 0] = cvt_clr.val8[0];
+            colours[idx*4 + 1] = cvt_clr.val8[1];
+            colours[idx*4 + 2] = cvt_clr.val8[2];
+            colours[idx*4 + 3] = cvt_clr.val8[3];
+        }
     }
-    terrainGroup->defineTerrain(x, y, pixels.data());
+}
+
+void TerrainStorage::getBlendmaps(float chunkSize, const Ogre::Vector2& chunkCenter, bool pack,
+                                  std::vector<Ogre::PixelBox>& blendmaps,
+                                  std::vector<Terrain::LayerInfo>& layerList)
+{
+    Ogre::LogManager::getSingleton().stream()<<
+        "Blendmaps for "<<chunkCenter.x<<","<<chunkCenter.y<<", size "<<chunkSize;
+}
+
+void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nodes, std::vector<Terrain::LayerCollection>& out, bool pack)
+{
+    for(Terrain::QuadTreeNode *node : nodes)
+    {
+        Terrain::LayerCollection layers;
+        layers.mTarget = node;
+
+        {
+            Terrain::LayerInfo layerinf{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", true, true};
+            layers.mLayers.push_back(std::move(layerinf));
+
+#if 0
+            int channels = (pack ? 4 : 1);
+            Ogre::PixelFormat format = (pack ? Ogre::PF_A8B8G8R8 : Ogre::PF_A8);
+            Ogre::uchar *pixdata = OGRE_ALLOC_T(Ogre::uchar, terrain_size*terrain_size*channels, Ogre::MEMCATEGORY_GENERAL);
+            memset(pixdata, 0, TERRAIN_SIZE*TERRAIN_SIZE*channels);
+
+            for(int y = 0;y < TERRAIN_SIZE;++y)
+            {
+                for(int x = 0;x < TERRAIN_SIZE;++x)
+                {
+                    for(int c = 0;c < channels;c++)
+                        pixdata[(y*TERRAIN_SIZE + x)*channels + c] = 255;
+                }
+            }
+            Ogre::PixelBox pixbox(TERRAIN_SIZE, TERRAIN_SIZE, 1, format, pixdata);
+
+            layers.mBlendmaps.push_back(std::move(pixbox));
+#endif
+        }
+        out.push_back(std::move(layers));
+    }
+}
+
+float TerrainStorage::getHeightAt(const Ogre::Vector3 &worldPos)
+{
+    float val = mFinalTerrain.GetValue(worldPos.x / TERRAIN_WORLD_SIZE, 0.0f, worldPos.z / -TERRAIN_WORLD_SIZE);
+    return (val*0.5f + 0.5f) * 600.0f;
 }
 
 
-bool TerrainPageProvider::prepareProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section) { return true; }
-bool TerrainPageProvider::loadProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section) { return true; }
-bool TerrainPageProvider::unloadProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section) { return true; }
-bool TerrainPageProvider::unprepareProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section) { return true; }
+
+void World::initialize(Ogre::Camera *camera, Ogre::Light *l)
+{
+    Ogre::SceneManager *sceneMgr = camera->getSceneManager();
+
+    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 1.0f, 64.0f);
+    mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
+                             false/*Settings::Manager::getBool("split", "Shadows")*/);
+    mTerrain->update(camera->getRealPosition());
+    mTerrain->setVisible(true);
+    mTerrain->syncLoad();
+    // need to update again so the chunks that were just loaded can be made visible
+    mTerrain->update(camera->getRealPosition());
+}
+
+void World::deinitialize()
+{
+    delete mTerrain;
+    mTerrain = nullptr;
+}
+
+
+float World::getHeightAt(const Ogre::Vector3 &pos) const
+{
+    return mTerrain->getHeightAt(pos);
+}
+
+void World::update(const Ogre::Vector3 &cameraPos)
+{
+    mTerrain->update(cameraPos);
+}
+
+
+World::World()
+  : mTerrain(nullptr)
+{
+}
+World World::sWorld;
 
 } // namespace TK

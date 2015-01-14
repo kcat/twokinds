@@ -1,14 +1,16 @@
 #ifndef TERRAIN_HPP
 #define TERRAIN_HPP
 
-#include "noiseutils/noiseutils.h"
-
-#include <OgrePageManager.h>
-#include <OgreTerrainPagedWorldSection.h>
-
 namespace Ogre
 {
-    class TerrainPaging;
+    class Vector3;
+    class Camera;
+    class Light;
+}
+
+namespace Terrain
+{
+    class World;
 }
 
 namespace TK
@@ -16,53 +18,22 @@ namespace TK
 
 class ImageSrcModule;
 
-class TerrainDefiner : public Ogre::TerrainPagedWorldSection::TerrainDefiner
+class World
 {
-    Ogre::Image mHeightmap;
+    static World sWorld;
 
-    std::unique_ptr<ImageSrcModule> mHeightmapModule;
-    noise::module::Perlin mNoiseModule;
+    Terrain::World *mTerrain;
 
-    noise::utils::NoiseMap mNoiseMap;
-    noise::utils::NoiseMapBuilderPlane mHeightMapBuilder;
-
-public:
-    TerrainDefiner();
-
-    virtual void define(Ogre::TerrainGroup *terrainGroup, long x, long y);
-};
-
-class TerrainPageProvider : public Ogre::PageProvider
-{
-public:
-    virtual bool prepareProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section);
-    virtual bool loadProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section);
-    virtual bool unloadProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section);
-    virtual bool unprepareProceduralPage(Ogre::Page *page, Ogre::PagedWorldSection *section);
-};
-
-class Terrain
-{
-    static Terrain sTerrain;
-
-    Ogre::TerrainGroup *mTerrainGroup;
-    Ogre::TerrainGlobalOptions *mTerrainGlobals;
-    Ogre::PageManager *mPageManager;
-    Ogre::TerrainPaging *mTerrainPaging;
-    Ogre::TerrainPagedWorldSection *mTerrainSection;
-    TerrainPageProvider *mPageProvider;
-
-    void configureTerrainDefaults(Ogre::SceneManager *sceneMgr, Ogre::Light *light);
-
-    Terrain();
+    World();
 public:
     void initialize(Ogre::Camera *camera, Ogre::Light *l);
     void deinitialize();
 
-    Ogre::TerrainGroup *getTerrainGroup() { return mTerrainGroup; }
+    float getHeightAt(const Ogre::Vector3 &pos) const;
+    void update(const Ogre::Vector3 &cameraPos);
 
-    static Terrain &get() { return sTerrain; }
-    static Terrain *getPtr() { return &sTerrain; }
+    static World &get() { return sWorld; }
+    static World *getPtr() { return &sWorld; }
 };
 
 } // namespace TK
