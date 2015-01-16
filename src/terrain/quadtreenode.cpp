@@ -232,6 +232,16 @@ void QuadTreeNode::initNeighbours(bool childrenOnly)
     }
 }
 
+void QuadTreeNode::updateNeighbour(Direction dir, ChildDirection id1, ChildDirection id2, QuadTreeNode *node)
+{
+    mNeighbours[dir] = node;
+    if(hasChildren())
+    {
+        mChildren[id1]->updateNeighbour(dir, id1, id2, node);
+        mChildren[id2]->updateNeighbour(dir, id1, id2, node);
+    }
+}
+
 void QuadTreeNode::initAabb()
 {
     float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
@@ -423,11 +433,10 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
                     mChildren[i] = 0;
                 }
                 // Children went away. Make sure our neighbours' children know
-                for (int i=0; i<4; ++i)
-                {
-                    if(mNeighbours[i])
-                        mNeighbours[i]->initNeighbours(true);
-                }
+                if(mNeighbours[North]) mNeighbours[North]->updateNeighbour(South, SE, SW, this);
+                if(mNeighbours[East ]) mNeighbours[East ]->updateNeighbour(West,  SW, NW, this);
+                if(mNeighbours[South]) mNeighbours[South]->updateNeighbour(North, NW, NE, this);
+                if(mNeighbours[West ]) mNeighbours[West ]->updateNeighbour(East,  NE, SE, this);
             }
             mChunk->setVisible(true);
 
