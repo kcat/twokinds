@@ -583,12 +583,12 @@ void QuadTreeNode::updateIndexBuffers()
     }
 }
 
-bool QuadTreeNode::hasChunk()
+bool QuadTreeNode::hasChunk() const
 {
     return mSceneNode->isInSceneGraph() && mChunk && mChunk->getVisible();
 }
 
-size_t QuadTreeNode::getActualLodLevel()
+size_t QuadTreeNode::getActualLodLevel() const
 {
     assert(hasChunk() && "Can't get actual LOD level if this node has no render chunk");
     return mLodLevel /* + mChunk->getAdditionalLod() */;

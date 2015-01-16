@@ -72,11 +72,11 @@ namespace Terrain
 
         Ogre::SceneNode* getSceneNode() { return mSceneNode; }
 
-        int getSize() { return mSize; }
-        Ogre::Vector2 getCenter() { return mCenter; }
+        int getSize() const { return mSize; }
+        const Ogre::Vector2& getCenter() const { return mCenter; }
 
-        bool hasChildren() { return mChildren[0] != 0; }
-        QuadTreeNode* getChild(ChildDirection dir) { return mChildren[dir]; }
+        bool hasChildren() const { return mChildren[0] != 0; }
+        QuadTreeNode* getChild(ChildDirection dir) const { return mChildren[dir]; }
 
         /// Returns our direction relative to the parent node, or Root if we are the root node.
         ChildDirection getDirection() const { return mDirection; }
@@ -86,7 +86,7 @@ namespace Terrain
 
         const Ogre::AxisAlignedBox& getWorldBoundingBox() const { return mWorldBounds; }
 
-        DefaultWorld* getTerrain() { return mTerrain; }
+        DefaultWorld* getTerrain() const { return mTerrain; }
 
         void buildQuadTree(const Ogre::Vector3 &cameraPos);
 
@@ -100,13 +100,13 @@ namespace Terrain
 
         /// Get the effective LOD level if this node was rendered in one chunk
         /// with Storage::getCellVertices^2 vertices
-        size_t getNativeLodLevel() { return mLodLevel; }
+        size_t getNativeLodLevel() const { return mLodLevel; }
 
         /// Get the effective current LOD level used by the chunk rendering this node
-        size_t getActualLodLevel();
+        size_t getActualLodLevel() const;
 
         /// Is this node currently configured to render itself?
-        bool hasChunk();
+        bool hasChunk() const;
 
         /// Add a textured quad to a specific 2d area in the composite map scenemanager.
         /// Only nodes with size <= 1 can be rendered with alpha blending, so larger nodes will simply
@@ -122,8 +122,6 @@ namespace Terrain
         void loadLayers (const LayerCollection& collection);
         /// This is recursive! Call it once on the root node after all leafs have loaded layers.
         void loadMaterials();
-
-        LoadState getLoadState() { return mLoadState; }
 
     private:
         // Stored here for convenience in case we need layer list again
