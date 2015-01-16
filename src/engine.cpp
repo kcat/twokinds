@@ -43,7 +43,13 @@ protected:
 public:
     ShaderGeneratorTechniqueResolverListener()
       : mShaderGenerator(Ogre::RTShader::ShaderGenerator::getSingleton())
-    { }
+    {
+        Ogre::MaterialManager::getSingleton().addListener(this);
+    }
+    virtual ~ShaderGeneratorTechniqueResolverListener()
+    {
+        Ogre::MaterialManager::getSingleton().removeListener(this);
+    }
 
     /**
      * This is the hook point where shader based technique will be created. It
@@ -372,7 +378,6 @@ bool Engine::go(void)
     Ogre::RTShader::ShaderGenerator::initialize();
 
     ShaderGeneratorTechniqueResolverListener sgtrl;
-    Ogre::MaterialManager::getSingleton().addListener(&sgtrl);
 
     /* Initialize all resource groups. Ogre is sensitive to the shaders being
      * initialized after the materials, so ensure the shaders get initialized
