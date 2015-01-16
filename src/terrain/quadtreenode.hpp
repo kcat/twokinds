@@ -124,7 +124,7 @@ namespace Terrain
         /// Create a chunk for this node from the given data.
         void load(const LoadResponseData& data);
         void unload();
-        void loadLayers (const LayerCollection& collection);
+        void loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, const std::vector<LayerInfo> &layerList);
         /// This is recursive! Call it once on the root node after all leafs have loaded layers.
         void loadMaterials();
 

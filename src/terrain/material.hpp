@@ -14,9 +14,9 @@ namespace Terrain
         MaterialGenerator ();
 
         void setLayerList (const std::vector<LayerInfo>& layerList) { mLayerList = layerList; }
-        bool hasLayers() { return mLayerList.size(); }
+        bool hasLayers() const { return !mLayerList.empty(); }
         void setBlendmapList (const std::vector<Ogre::TexturePtr>& blendmapList) { mBlendmapList = blendmapList; }
-        const std::vector<Ogre::TexturePtr>& getBlendmapList() { return mBlendmapList; }
+        const std::vector<Ogre::TexturePtr>& getBlendmapList() const { return mBlendmapList; }
         void setCompositeMap (const std::string& name) { mCompositeMap = name; }
 
         void enableShaders(bool shaders) { mShaders = shaders; }

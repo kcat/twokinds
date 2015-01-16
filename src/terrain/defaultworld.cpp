@@ -54,7 +54,7 @@ namespace Terrain
 {
 
     const Ogre::uint REQ_ID_CHUNK = 1;
-    const Ogre::uint REQ_ID_LAYERS = 2;
+    const Ogre::uint REQ_ID_LAYER = 2;
 
     DefaultWorld::DefaultWorld(Ogre::SceneManager* sceneMgr,
                      Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
@@ -109,8 +109,7 @@ namespace Terrain
         wq->addRequestHandler(mWorkQueueChannel, this);
         wq->addResponseHandler(mWorkQueueChannel, this);
 
-        std::vector<QuadTreeNode*> leafs(1, mRootNode);
-        queueLayerLoad(leafs);
+        queueLayerLoad(mRootNode);
     }
 
     DefaultWorld::~DefaultWorld()
@@ -207,23 +206,21 @@ namespace Terrain
         if (req->getType() == REQ_ID_CHUNK)
         {
             const LoadRequestData data = Ogre::any_cast<LoadRequestData>(req->getData());
-
-            QuadTreeNode* node = data.mNode;
-
             LoadResponseData* responseData = new LoadResponseData();
 
-            getStorage()->fillVertexBuffers(node->getNativeLodLevel(), node->getSize(), node->getCenter(), getAlign(),
-                                            responseData->mPositions, responseData->mNormals, responseData->mColours);
-
+            getStorage()->fillVertexBuffers(
+                data.mNode->getNativeLodLevel(), data.mNode->getSize(), data.mNode->getCenter(), getAlign(),
+                responseData->mPositions, responseData->mNormals, responseData->mColours
+            );
             return OGRE_NEW Ogre::WorkQueue::Response(req, true, Ogre::Any(responseData));
         }
-        else // REQ_ID_LAYERS
+        else // REQ_ID_LAYER
         {
-            const LayersRequestData data = Ogre::any_cast<LayersRequestData>(req->getData());
+            const LayerRequestData data = Ogre::any_cast<LayerRequestData>(req->getData());
+            LayerResponseData* responseData = new LayerResponseData();
 
-            LayersResponseData* responseData = new LayersResponseData();
-
-            getStorage()->getBlendmaps(data.mNodes, responseData->mLayerCollections, data.mPack);
+            getStorage()->getBlendmaps(data.mNode->getSize(), data.mNode->getCenter(), data.mPack,
+                                       responseData->mBlendmaps, responseData->mLayers);
 
             return OGRE_NEW Ogre::WorkQueue::Response(req, true, Ogre::Any(responseData));
         }
@@ -236,7 +233,6 @@ namespace Terrain
         if (res->getRequest()->getType() == REQ_ID_CHUNK)
         {
             LoadResponseData* data = Ogre::any_cast<LoadResponseData*>(res->getData());
-
             const LoadRequestData requestData = Ogre::any_cast<LoadRequestData>(res->getRequest()->getData());
 
             requestData.mNode->load(*data);
@@ -245,18 +241,15 @@ namespace Terrain
 
             --mChunksLoading;
         }
-        else // REQ_ID_LAYERS
+        else // REQ_ID_LAYER
         {
-            LayersResponseData* data = Ogre::any_cast<LayersResponseData*>(res->getData());
+            LayerResponseData* data = Ogre::any_cast<LayerResponseData*>(res->getData());
+            const LayerRequestData requestData = Ogre::any_cast<LayerRequestData>(res->getRequest()->getData());
 
-            for (std::vector<LayerCollection>::iterator it = data->mLayerCollections.begin(); it != data->mLayerCollections.end(); ++it)
-            {
-                it->mTarget->loadLayers(*it);
-            }
+            requestData.mNode->loadLayers(data->mBlendmaps, data->mLayers);
+            requestData.mNode->loadMaterials();
 
             delete data;
-
-            mRootNode->loadMaterials();
 
             --mLayersLoading;
         }
@@ -271,13 +264,13 @@ namespace Terrain
         ++mChunksLoading;
     }
 
-    void DefaultWorld::queueLayerLoad(std::vector<QuadTreeNode*> &leafs)
+    void DefaultWorld::queueLayerLoad(QuadTreeNode *node)
     {
-        LayersRequestData data;
+        LayerRequestData data;
+        data.mNode = node;
         data.mPack = getShadersEnabled();
-        data.mNodes = std::move(leafs);
 
-        Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_LAYERS, Ogre::Any(data));
+        Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_LAYER, Ogre::Any(data));
         ++mLayersLoading;
     }
 }

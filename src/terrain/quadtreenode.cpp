@@ -183,6 +183,14 @@ void QuadTreeNode::reset(ChildDirection dir, int size, const Ogre::Vector2& cent
 void QuadTreeNode::free()
 {
     unload();
+
+    Ogre::TextureManager &texMgr = Ogre::TextureManager::getSingleton();
+    std::vector<Ogre::TexturePtr> oldlist = mMaterialGenerator->getBlendmapList();
+    for(Ogre::TexturePtr &tex : oldlist)
+        texMgr.remove(tex->getName());
+    mMaterialGenerator->setBlendmapList(std::vector<Ogre::TexturePtr>());
+    mMaterialGenerator->setLayerList(std::vector<LayerInfo>());
+
     mSceneNode->removeAllChildren();
     Ogre::SceneNode *parent = mSceneNode->getParentSceneNode();
     if(parent) parent->removeChild(mSceneNode);
@@ -319,6 +327,7 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
                                         Ogre::Vector3( halfSize*cellWorldSize,  halfSize*cellWorldSize, maxZ));
             mTerrain->convertBounds(bounds);
             mBounds = bounds;
+            mTerrain->queueLayerLoad(this);
         }
         else
             markAsDummy(); // no data available for this node, skip it
@@ -353,8 +362,7 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
         if (!getChild((ChildDirection)i)->isDummy())
         {
             // Only valid if we have at least one non-dummy child
-            std::vector<QuadTreeNode*> leafs(mChildren+0, mChildren+4);
-            mTerrain->queueLayerLoad(leafs);
+            mTerrain->queueLayerLoad(this);
             return;
         }
     }
@@ -510,7 +518,7 @@ void QuadTreeNode::load(const LoadResponseData &data)
     mMaterialGenerator->enableShadows(mTerrain->getShadowsEnabled());
     mMaterialGenerator->enableSplitShadows(mTerrain->getSplitShadowsEnabled());
 
-    if (mTerrain->areLayersLoaded())
+    if (mMaterialGenerator->hasLayers())
     {
         if (mSize <= 1)
         {
@@ -605,16 +613,15 @@ size_t QuadTreeNode::getActualLodLevel() const
     return mLodLevel /* + mChunk->getAdditionalLod() */;
 }
 
-void QuadTreeNode::loadLayers(const LayerCollection& collection)
+void QuadTreeNode::loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, const std::vector<LayerInfo> &layerList)
 {
     assert (!mMaterialGenerator->hasLayers());
 
     Ogre::TextureManager &texMgr = Ogre::TextureManager::getSingleton();
 
     std::vector<Ogre::TexturePtr> blendTextures;
-    for (std::vector<Ogre::PixelBox>::const_iterator it = collection.mBlendmaps.begin(); it != collection.mBlendmaps.end(); ++it)
+    for (std::vector<Ogre::PixelBox>::const_iterator it = blendmaps.begin(); it != blendmaps.end(); ++it)
     {
-        // TODO: clean up blend textures on destruction
         static int count=0;
         Ogre::TexturePtr map = texMgr.createManual("terrain/blend/" + Ogre::StringConverter::toString(count++),
             Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
@@ -626,7 +633,7 @@ void QuadTreeNode::loadLayers(const LayerCollection& collection)
     }
 
     std::vector<Ogre::TexturePtr> oldlist = mMaterialGenerator->getBlendmapList();
-    mMaterialGenerator->setLayerList(collection.mLayers);
+    mMaterialGenerator->setLayerList(layerList);
     mMaterialGenerator->setBlendmapList(blendTextures);
     for(Ogre::TexturePtr &tex : oldlist)
         texMgr.remove(tex->getName());
@@ -644,7 +651,7 @@ void QuadTreeNode::loadMaterials()
             mChildren[i]->loadMaterials();
     }
 
-    if (mChunk)
+    if (mChunk && mMaterialGenerator->hasLayers())
     {
         if (mSize <= 1)
         {

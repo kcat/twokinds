@@ -116,8 +116,8 @@ namespace Terrain
 
         // Adds a WorkQueue request to load a chunk for this node in the background.
         void queueChunkLoad (QuadTreeNode* node);
-        // Adds a WorkQueue request to load layers for these nodes in the background.
-        void queueLayerLoad (std::vector<QuadTreeNode*>& leafs);
+        // Adds a WorkQueue request to load layers for this node in the background.
+        void queueLayerLoad (QuadTreeNode* leafs);
 
     private:
         Ogre::RenderTarget* mCompositeMapRenderTarget;
@@ -142,20 +142,22 @@ namespace Terrain
         { return o; }
     };
 
-    struct LayersRequestData
+    struct LayerRequestData
     {
-        std::vector<QuadTreeNode*> mNodes;
+        QuadTreeNode *mNode;
         bool mPack;
 
-        friend std::ostream& operator<<(std::ostream& o, const LayersRequestData& r)
+        friend std::ostream& operator<<(std::ostream& o, const LayerRequestData& r)
         { return o; }
     };
 
-    struct LayersResponseData
+    struct LayerResponseData
     {
-        std::vector<LayerCollection> mLayerCollections;
+        // Since we can't create a texture from a different thread, this only holds the raw texel data
+        std::vector<Ogre::PixelBox> mBlendmaps;
+        std::vector<LayerInfo> mLayers;
 
-        friend std::ostream& operator<<(std::ostream& o, const LayersResponseData& r)
+        friend std::ostream& operator<<(std::ostream& o, const LayerResponseData& r)
         { return o; }
     };
 
