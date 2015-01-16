@@ -618,8 +618,8 @@ void QuadTreeNode::loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, cons
     assert (!mMaterialGenerator->hasLayers());
 
     Ogre::TextureManager &texMgr = Ogre::TextureManager::getSingleton();
-
     std::vector<Ogre::TexturePtr> blendTextures;
+
     for (std::vector<Ogre::PixelBox>::const_iterator it = blendmaps.begin(); it != blendmaps.end(); ++it)
     {
         static int count=0;
@@ -632,11 +632,8 @@ void QuadTreeNode::loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, cons
         blendTextures.push_back(map);
     }
 
-    std::vector<Ogre::TexturePtr> oldlist = mMaterialGenerator->getBlendmapList();
     mMaterialGenerator->setLayerList(layerList);
     mMaterialGenerator->setBlendmapList(blendTextures);
-    for(Ogre::TexturePtr &tex : oldlist)
-        texMgr.remove(tex->getName());
 }
 
 void QuadTreeNode::loadMaterials()
