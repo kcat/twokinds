@@ -57,7 +57,7 @@ namespace Terrain
     const Ogre::uint REQ_ID_LAYERS = 2;
 
     DefaultWorld::DefaultWorld(Ogre::SceneManager* sceneMgr,
-                     Storage* storage, int visibilityFlags, bool shaders, Alignment align, float maxBatchSize)
+                     Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
         : World(sceneMgr, storage, visibilityFlags, shaders, align)
         , mWorkQueueChannel(0)
         , mVisible(true)
@@ -183,7 +183,7 @@ namespace Terrain
         mFreeNodes.push_back(node);
     }
 
-    QuadTreeNode *DefaultWorld::createNode(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent)
+    QuadTreeNode *DefaultWorld::createNode(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent)
     {
         if(mFreeNodes.empty())
             return new QuadTreeNode(this, dir, size, center, parent);

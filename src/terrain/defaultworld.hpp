@@ -35,10 +35,9 @@ namespace Terrain
         /// @param shaders Whether to use splatting shader, or multi-pass fixed function splatting. Shader is usually
         ///         faster so this is just here for compatibility.
         /// @param align The align of the terrain, see Alignment enum
-        /// @param minBatchSize Minimum size of a terrain batch along one side (in cell units). Used for building the quad tree.
         /// @param maxBatchSize Maximum size of a terrain batch along one side (in cell units). Used when traversing the quad tree.
         DefaultWorld(Ogre::SceneManager* sceneMgr,
-                Storage* storage, int visibilityFlags, bool shaders, Alignment align, float maxBatchSize);
+                Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize);
         ~DefaultWorld();
 
         /// Update chunk LODs according to this camera position
@@ -97,7 +96,7 @@ namespace Terrain
         float mMinX, mMaxX, mMinY, mMaxY;
 
         /// Maximum size of a terrain batch along one side (in cell units)
-        float mMaxBatchSize;
+        int mMaxBatchSize;
 
         /// Reusable nodes
         std::vector<QuadTreeNode*> mFreeNodes;
@@ -113,7 +112,7 @@ namespace Terrain
         void renderCompositeMap (Ogre::TexturePtr target);
 
         void freeNode(QuadTreeNode *node);
-        QuadTreeNode *createNode(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
+        QuadTreeNode *createNode(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent);
 
         // Adds a WorkQueue request to load a chunk for this node in the background.
         void queueLoad (QuadTreeNode* node);

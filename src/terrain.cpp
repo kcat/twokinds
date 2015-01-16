@@ -319,7 +319,7 @@ void World::initialize(Ogre::Camera *camera, Ogre::Light *l)
 {
     Ogre::SceneManager *sceneMgr = camera->getSceneManager();
 
-    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536.0f);
+    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
     mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
                              false/*Settings::Manager::getBool("split", "Shadows")*/);
     mTerrain->update(camera->getRealPosition());

@@ -39,11 +39,11 @@ namespace Terrain
         /// @param size size (in *cell* units!)
         /// @param center center (in *cell* units!)
         /// @param parent parent node
-        QuadTreeNode (DefaultWorld* terrain, ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
+        QuadTreeNode (DefaultWorld* terrain, ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent);
         ~QuadTreeNode();
 
         /// Resets the internal node properties, as if it was reallocated
-        void reset(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
+        void reset(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent);
 
         /// Recursively frees itself and its children, disconnecting from the
         /// graph and unloading resources before returning the node(s) to the
@@ -60,7 +60,7 @@ namespace Terrain
         void initAabb();
 
         /// @note takes ownership of \a child
-        void createChild (ChildDirection id, float size, const Ogre::Vector2& center);
+        void createChild (ChildDirection id, int size, const Ogre::Vector2& center);
 
         /// Mark this node as a dummy node. This can happen if the terrain size isn't a power of two.
         /// For the QuadTree to work, we need to round the size up to a power of two, which means we'll
@@ -130,7 +130,7 @@ namespace Terrain
         LoadState mLoadState;
 
         bool mIsDummy;
-        float mSize;
+        int mSize;
         size_t mLodLevel; // LOD if we were to render this node in one chunk
         Ogre::AxisAlignedBox mBounds;
         Ogre::AxisAlignedBox mWorldBounds;

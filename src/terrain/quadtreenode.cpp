@@ -112,7 +112,7 @@ namespace
     }
 }
 
-QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, float size, const Ogre::Vector2 &center, QuadTreeNode* parent)
+QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, int size, const Ogre::Vector2 &center, QuadTreeNode* parent)
     : mMaterialGenerator(NULL)
     , mLoadState(LS_Unloaded)
     , mIsDummy(false)
@@ -151,7 +151,7 @@ QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, float size
     mMaterialGenerator->enableShaders(mTerrain->getShadersEnabled());
 }
 
-void QuadTreeNode::reset(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent)
+void QuadTreeNode::reset(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent)
 {
     mSize = size;
     mLodLevel = Log2(mSize);
@@ -198,7 +198,7 @@ void QuadTreeNode::free()
 }
 
 
-void QuadTreeNode::createChild(ChildDirection id, float size, const Ogre::Vector2 &center)
+void QuadTreeNode::createChild(ChildDirection id, int size, const Ogre::Vector2 &center)
 {
     mChildren[id] = mTerrain->createNode(id, size, center, this);
 }
@@ -258,8 +258,9 @@ void QuadTreeNode::initAabb()
                 maxH = mBounds.getMaximum().x;
                 break;
         }
-        Ogre::Vector3 min(-mSize/2*cellWorldSize, -mSize/2*cellWorldSize, minH);
-        Ogre::Vector3 max(Ogre::Vector3(mSize/2*cellWorldSize, mSize/2*cellWorldSize, maxH));
+        float halfSize = mSize/2.f;
+        Ogre::Vector3 min(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minH);
+        Ogre::Vector3 max(Ogre::Vector3(halfSize*cellWorldSize, halfSize*cellWorldSize, maxH));
         mBounds = Ogre::AxisAlignedBox (min, max);
         mTerrain->convertBounds(mBounds);
     }
@@ -268,7 +269,7 @@ void QuadTreeNode::initAabb()
         float minZ, maxZ;
         if (mTerrain->getStorage()->getMinMaxHeights(mSize, mCenter, minZ, maxZ))
         {
-            float halfSize = mSize/2.0f;
+            float halfSize = mSize/2.f;
             Ogre::AxisAlignedBox bounds(Ogre::Vector3(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minZ),
                                         Ogre::Vector3( halfSize*cellWorldSize,  halfSize*cellWorldSize, maxZ));
             mTerrain->convertBounds(bounds);
@@ -283,8 +284,6 @@ void QuadTreeNode::initAabb()
 
 void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
 {
-    float halfSize = mSize/2.f;
-
     if(mWorldBounds.isNull())
         initAabb();
     float dist = mWorldBounds.distance(cameraPos);
@@ -297,7 +296,7 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
     if(dist > cellWorldSize*1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
         wantedLod = Log2(dist/cellWorldSize)+1;
 
-    bool isLeaf = mSize <= 1.0f || (mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod);
+    bool isLeaf = mSize <= 1 || (mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod);
     if (isLeaf)
     {
         // We arrived at a leaf
@@ -305,6 +304,7 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
         float minZ,maxZ;
         if (storage->getMinMaxHeights(mSize, mCenter, minZ, maxZ))
         {
+            float halfSize = mSize/2.f;
             Ogre::AxisAlignedBox bounds(Ogre::Vector3(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minZ),
                                         Ogre::Vector3( halfSize*cellWorldSize,  halfSize*cellWorldSize, maxZ));
             mTerrain->convertBounds(bounds);
@@ -315,6 +315,7 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
         return;
     }
 
+    float halfSize = mSize/2.f;
     if (mCenter.x - halfSize > mTerrain->getMaxX()
             || mCenter.x + halfSize < mTerrain->getMinX()
             || mCenter.y - halfSize > mTerrain->getMaxY()
@@ -327,27 +328,28 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
     }
 
     // Not a leaf, create its children
-    createChild(SW, halfSize, mCenter - halfSize/2.f);
-    createChild(SE, halfSize, mCenter + Ogre::Vector2(halfSize/2.f, -halfSize/2.f));
-    createChild(NW, halfSize, mCenter + Ogre::Vector2(-halfSize/2.f, halfSize/2.f));
-    createChild(NE, halfSize, mCenter + halfSize/2.f);
+    int childSize = mSize>>1;
+    createChild(SW, childSize, mCenter - halfSize/2.f);
+    createChild(SE, childSize, mCenter + Ogre::Vector2(halfSize/2.f, -halfSize/2.f));
+    createChild(NW, childSize, mCenter + Ogre::Vector2(-halfSize/2.f, halfSize/2.f));
+    createChild(NE, childSize, mCenter + halfSize/2.f);
     mChildren[SW]->buildQuadTree(cameraPos);
     mChildren[SE]->buildQuadTree(cameraPos);
     mChildren[NW]->buildQuadTree(cameraPos);
     mChildren[NE]->buildQuadTree(cameraPos);
 
-    // if all children are dummy, we are also dummy
     for (int i=0; i<4; ++i)
     {
         if (!getChild((ChildDirection)i)->isDummy())
         {
+            // Only valid if we have at least one non-dummy child
             std::vector<QuadTreeNode*> leafs(mChildren+0, mChildren+4);
             mTerrain->queueLayerLoad(leafs);
             return;
         }
     }
+    // if all children are dummy, we are also dummy and have no need for children
     markAsDummy();
-    // We're a dummy node, no need for children
     for (int i=0; i<4; ++i)
     {
         mChildren[i]->free();
