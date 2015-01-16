@@ -75,80 +75,8 @@ namespace Terrain
         std::stringstream name;
         name << "terrain/mat" << count++;
 
-        if (!mShaders)
-        {
-            Ogre::MaterialPtr mat = Ogre::MaterialManager::getSingleton().create(name.str(),
-                                                               Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
-            Ogre::Technique* technique = mat->getTechnique(0);
-            technique->removeAllPasses();
-
-            if (displayCompositeMap)
-            {
-                Ogre::Pass* pass = technique->createPass();
-                pass->setVertexColourTracking(Ogre::TVC_AMBIENT|Ogre::TVC_DIFFUSE);
-                pass->createTextureUnitState(mCompositeMap)->setTextureAddressingMode(Ogre::TextureUnitState::TAM_CLAMP);
-            }
-            else
-            {
-                assert(mLayerList.size() == mBlendmapList.size()+1);
-                std::vector<Ogre::TexturePtr>::iterator blend = mBlendmapList.begin();
-                for (std::vector<LayerInfo>::iterator layer = mLayerList.begin(); layer != mLayerList.end(); ++layer)
-                {
-                    Ogre::Pass* pass = technique->createPass();
-                    pass->setLightingEnabled(false);
-                    pass->setVertexColourTracking(Ogre::TVC_NONE);
-                    // TODO: How to handle fog?
-                    pass->setFog(true, Ogre::FOG_NONE);
-
-                    bool first = (layer == mLayerList.begin());
-
-                    Ogre::TextureUnitState* tus;
-
-                    if (!first)
-                    {
-                        pass->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
-                        pass->setDepthFunction(Ogre::CMPF_EQUAL);
-
-                        tus = pass->createTextureUnitState((*blend)->getName());
-                        tus->setAlphaOperation(Ogre::LBX_BLEND_TEXTURE_ALPHA,
-                                               Ogre::LBS_TEXTURE,
-                                               Ogre::LBS_TEXTURE);
-                        tus->setColourOperationEx(Ogre::LBX_BLEND_DIFFUSE_ALPHA,
-                                                  Ogre::LBS_TEXTURE,
-                                                  Ogre::LBS_TEXTURE);
-                        tus->setIsAlpha(true);
-                        tus->setTextureAddressingMode(Ogre::TextureUnitState::TAM_CLAMP);
-
-                        float scale = (16/(16.f+1.f));
-                        tus->setTextureScale(1.f/scale,1.f/scale);
-                    }
-
-                    // Add the actual layer texture on top of the alpha map.
-                    tus = pass->createTextureUnitState(layer->mDiffuseMap);
-                    if (!first)
-                        tus->setColourOperationEx(Ogre::LBX_BLEND_DIFFUSE_ALPHA,
-                                                  Ogre::LBS_TEXTURE,
-                                                  Ogre::LBS_CURRENT);
-
-                    tus->setTextureScale(1/16.f,1/16.f);
-
-                    if (!first)
-                        ++blend;
-                }
-
-                if (!renderCompositeMap)
-                {
-                    Ogre::Pass* lightingPass = technique->createPass();
-                    lightingPass->setSceneBlending(Ogre::SBT_MODULATE);
-                    lightingPass->setVertexColourTracking(Ogre::TVC_AMBIENT|Ogre::TVC_DIFFUSE);
-                    lightingPass->setFog(true, Ogre::FOG_NONE);
-                }
-            }
-
-            return mat;
-        }
 #if TERRAIN_USE_SHADER
-        else
+        if (mShaders)
         {
             sh::MaterialInstance* material = sh::Factory::getInstance().createMaterialInstance (name.str());
             material->setProperty ("allow_fixed_function", sh::makeProperty<sh::BooleanValue>(new sh::BooleanValue(false)));
@@ -346,9 +274,76 @@ namespace Terrain
                     layerOffset += numLayersInThisPass;
                 }
             }
+            return Ogre::MaterialManager::getSingleton().getByName(name.str());
         }
 #endif
-        return Ogre::MaterialManager::getSingleton().getByName(name.str());
+
+        Ogre::MaterialPtr mat = Ogre::MaterialManager::getSingleton().create(name.str(),
+                                                            Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+        Ogre::Technique* technique = mat->getTechnique(0);
+        technique->removeAllPasses();
+
+        if (displayCompositeMap)
+        {
+            Ogre::Pass* pass = technique->createPass();
+            pass->setVertexColourTracking(Ogre::TVC_AMBIENT|Ogre::TVC_DIFFUSE);
+            pass->createTextureUnitState(mCompositeMap)->setTextureAddressingMode(Ogre::TextureUnitState::TAM_CLAMP);
+        }
+        else
+        {
+            assert(mLayerList.size() == mBlendmapList.size()+1);
+            std::vector<Ogre::TexturePtr>::iterator blend = mBlendmapList.begin();
+            for (std::vector<LayerInfo>::iterator layer = mLayerList.begin(); layer != mLayerList.end(); ++layer)
+            {
+                Ogre::Pass* pass = technique->createPass();
+                pass->setLightingEnabled(false);
+                pass->setVertexColourTracking(Ogre::TVC_NONE);
+                // TODO: How to handle fog?
+                pass->setFog(true, Ogre::FOG_NONE);
+
+                bool first = (layer == mLayerList.begin());
+
+                Ogre::TextureUnitState* tus;
+
+                if (!first)
+                {
+                    pass->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
+                    pass->setDepthFunction(Ogre::CMPF_EQUAL);
+
+                    tus = pass->createTextureUnitState((*blend)->getName());
+                    tus->setAlphaOperation(Ogre::LBX_BLEND_TEXTURE_ALPHA,
+                                           Ogre::LBS_TEXTURE, Ogre::LBS_TEXTURE);
+                    tus->setColourOperationEx(Ogre::LBX_BLEND_DIFFUSE_ALPHA,
+                                              Ogre::LBS_TEXTURE, Ogre::LBS_TEXTURE);
+                    tus->setIsAlpha(true);
+                    tus->setTextureAddressingMode(Ogre::TextureUnitState::TAM_CLAMP);
+
+                    float scale = (16.f+1.f) / 16.0f;
+                    tus->setTextureScale(scale, scale);
+                }
+
+                // Add the actual layer texture on top of the alpha map.
+                tus = pass->createTextureUnitState(layer->mDiffuseMap);
+                if (!first)
+                    tus->setColourOperationEx(Ogre::LBX_BLEND_DIFFUSE_ALPHA,
+                                              Ogre::LBS_TEXTURE, Ogre::LBS_CURRENT);
+
+                tus->setTextureScale(1.0f/16.f, 1.0f/16.f);
+
+                if (!first)
+                    ++blend;
+            }
+
+            if (!renderCompositeMap)
+            {
+                Ogre::Pass* lightingPass = technique->createPass();
+                lightingPass->setSceneBlending(Ogre::SBT_MODULATE);
+                lightingPass->setVertexColourTracking(Ogre::TVC_AMBIENT|Ogre::TVC_DIFFUSE);
+                lightingPass->setFog(true, Ogre::FOG_NONE);
+            }
+        }
+
+        return mat;
     }
 
 }
