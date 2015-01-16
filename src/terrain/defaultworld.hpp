@@ -105,8 +105,6 @@ namespace Terrain
         // ----INTERNAL----
         Ogre::SceneManager* getCompositeMapSceneManager() { return mCompositeMapSceneMgr; }
 
-        bool areLayersLoaded() { return !mLayersLoading; }
-
         // Delete all quads
         void clearCompositeMapSceneManager();
         void renderCompositeMap (Ogre::TexturePtr target);
