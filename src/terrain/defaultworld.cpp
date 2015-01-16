@@ -262,7 +262,7 @@ namespace Terrain
         }
     }
 
-    void DefaultWorld::queueLoad(QuadTreeNode *node)
+    void DefaultWorld::queueChunkLoad(QuadTreeNode *node)
     {
         LoadRequestData data;
         data.mNode = node;

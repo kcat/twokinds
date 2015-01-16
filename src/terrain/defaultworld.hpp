@@ -115,7 +115,7 @@ namespace Terrain
         QuadTreeNode *createNode(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent);
 
         // Adds a WorkQueue request to load a chunk for this node in the background.
-        void queueLoad (QuadTreeNode* node);
+        void queueChunkLoad (QuadTreeNode* node);
         // Adds a WorkQueue request to load layers for these nodes in the background.
         void queueLayerLoad (std::vector<QuadTreeNode*>& leafs);
 

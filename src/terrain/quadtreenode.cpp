@@ -114,7 +114,7 @@ namespace
 
 QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, int size, const Ogre::Vector2 &center, QuadTreeNode* parent)
     : mMaterialGenerator(NULL)
-    , mLoadState(LS_Unloaded)
+    , mChunkLoadState(LS_Unloaded)
     , mIsDummy(false)
     , mSize(size)
     , mLodLevel(Log2(mSize))
@@ -159,7 +159,7 @@ void QuadTreeNode::reset(ChildDirection dir, int size, const Ogre::Vector2& cent
     mCenter = center;
     mParent = parent;
 
-    mLoadState = LS_Unloaded;
+    mChunkLoadState = LS_Unloaded;
     mIsDummy = false;
     mBounds.setNull();
     mWorldBounds.setNull();
@@ -396,14 +396,14 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
     if (wantToDisplay)
     {
         // Wanted LOD is small enough to render this node in one chunk
-        if (mLoadState == LS_Unloaded)
+        if (mChunkLoadState == LS_Unloaded)
         {
-            mLoadState = LS_Loading;
-            mTerrain->queueLoad(this);
+            mChunkLoadState = LS_Loading;
+            mTerrain->queueChunkLoad(this);
             return false;
         }
 
-        if (mLoadState == LS_Loaded)
+        if (mChunkLoadState == LS_Loaded)
         {
             // Additional (index buffer) LOD is currently disabled.
             // This is due to a problem with the LOD selection when a node splits.
@@ -526,7 +526,7 @@ void QuadTreeNode::load(const LoadResponseData &data)
     // else: will be loaded in loadMaterials() after background thread has finished loading layers
     mChunk->setVisible(false);
 
-    mLoadState = LS_Loaded;
+    mChunkLoadState = LS_Loaded;
 }
 
 void QuadTreeNode::unload()
@@ -545,7 +545,7 @@ void QuadTreeNode::unload()
         }
 
         // Do *not* set this when we are still loading!
-        mLoadState = LS_Unloaded;
+        mChunkLoadState = LS_Unloaded;
     }
 }
 

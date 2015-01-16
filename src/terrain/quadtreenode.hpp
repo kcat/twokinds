@@ -132,7 +132,7 @@ namespace Terrain
         // Stored here for convenience in case we need layer list again
         MaterialGenerator* mMaterialGenerator;
 
-        LoadState mLoadState;
+        LoadState mChunkLoadState;
 
         bool mIsDummy;
         int mSize;
