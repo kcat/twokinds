@@ -165,10 +165,9 @@ namespace Terrain
 
     Ogre::HardwareVertexBufferSharedPtr BufferCache::getUVBuffer()
     {
-        if (mUvBufferMap.find(mNumVerts) != mUvBufferMap.end())
-        {
-            return mUvBufferMap[mNumVerts];
-        }
+        std::map<int,Ogre::HardwareVertexBufferSharedPtr>::const_iterator it = mUvBufferMap.find(mNumVerts);
+        if (it != mUvBufferMap.end())
+            return it->second;
 
         int vertexCount = mNumVerts * mNumVerts;
 
@@ -199,10 +198,9 @@ namespace Terrain
     {
         unsigned int verts = mNumVerts;
 
-        if (mIndexBufferMap.find(flags) != mIndexBufferMap.end())
-        {
-            return mIndexBufferMap[flags];
-        }
+        std::map<int,Ogre::HardwareIndexBufferSharedPtr>::const_iterator it = mIndexBufferMap.find(flags);
+        if (it != mIndexBufferMap.end())
+            return it->second;
 
         Ogre::HardwareIndexBufferSharedPtr buffer;
         if (verts*verts > (0xffffu))
@@ -210,7 +208,7 @@ namespace Terrain
         else
             buffer = createIndexBuffer<unsigned short>(flags, verts, Ogre::HardwareIndexBuffer::IT_16BIT);
 
-        mIndexBufferMap[flags] = buffer;
+        mIndexBufferMap.insert(std::make_pair(flags, buffer));
         return buffer;
     }
 

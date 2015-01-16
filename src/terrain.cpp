@@ -126,7 +126,7 @@ public:
 
 class TerrainStorage : public Terrain::Storage
 {
-    ImageSrcModule mHeightmapModule;
+    ImageInterpSrcModule mHeightmapModule;
 
     noise::module::Perlin mBaseFieldsTerrain;
     noise::module::ScaleBias mFieldsTerrain;
@@ -189,11 +189,10 @@ TerrainStorage::TerrainStorage()
 
 void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& maxY)
 {
-    /* FIXME: Use image size once large terrains properly work */
-    minX = -32;//-(int)mHeightmapModule.GetImage().getWidth()/2;
-    minY = -32;//-(int)mHeightmapModule.GetImage().getHeight()/2;
-    maxX =  32;//mHeightmapModule.GetImage().getWidth()/2;
-    maxY =  32;//mHeightmapModule.GetImage().getHeight()/2;
+    minX = -(int)mHeightmapModule.GetImage().getWidth()/2;
+    minY = -(int)mHeightmapModule.GetImage().getHeight()/2;
+    maxX =  mHeightmapModule.GetImage().getWidth()/2;
+    maxY =  mHeightmapModule.GetImage().getHeight()/2;
 }
 
 bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
@@ -209,7 +208,7 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
 {
     assert(size == 1<<lodLevel);
 
-    const float cell_vtx = 1.0f/((TERRAIN_SIZE-1)>>lodLevel);
+    const float cell_vtx = size / (TERRAIN_SIZE-1);
     noise::utils::NoiseMap output;
     noise::utils::NoiseMapBuilderPlane builder;
     builder.SetSourceModule(mFinalTerrain);
@@ -225,7 +224,7 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
     noise::utils::Image normalmap(output.GetWidth(), output.GetHeight());
     noise::utils::RendererNormalMap normrender;
     /* *0.5f since libnoise goes from -1..+1, rather than 0..1 */
-    normrender.SetBumpHeight(TERRAIN_WORLD_HEIGHT*0.5f / (TERRAIN_WORLD_SIZE / TERRAIN_SIZE));
+    normrender.SetBumpHeight(TERRAIN_WORLD_HEIGHT*0.5f / (TERRAIN_WORLD_SIZE / (TERRAIN_SIZE-1)) / size);
     normrender.SetSourceNoiseMap(output);
     normrender.SetDestImage(normalmap);
     normrender.Render();
@@ -320,11 +319,10 @@ void World::initialize(Ogre::Camera *camera, Ogre::Light *l)
 {
     Ogre::SceneManager *sceneMgr = camera->getSceneManager();
 
-    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 1.0f, 64.0f);
+    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536.0f);
     mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
                              false/*Settings::Manager::getBool("split", "Shadows")*/);
     mTerrain->update(camera->getRealPosition());
-    mTerrain->setVisible(true);
     mTerrain->syncLoad();
     // need to update again so the chunks that were just loaded can be made visible
     mTerrain->update(camera->getRealPosition());

@@ -57,18 +57,17 @@ namespace Terrain
     const Ogre::uint REQ_ID_LAYERS = 2;
 
     DefaultWorld::DefaultWorld(Ogre::SceneManager* sceneMgr,
-                     Storage* storage, int visibilityFlags, bool shaders, Alignment align, float minBatchSize, float maxBatchSize)
+                     Storage* storage, int visibilityFlags, bool shaders, Alignment align, float maxBatchSize)
         : World(sceneMgr, storage, visibilityFlags, shaders, align)
         , mWorkQueueChannel(0)
         , mVisible(true)
         , mChunksLoading(0)
+        , mLayersLoading(0)
         , mMinX(0)
         , mMaxX(0)
         , mMinY(0)
         , mMaxY(0)
-        , mMinBatchSize(minBatchSize)
         , mMaxBatchSize(maxBatchSize)
-        , mLayerLoadPending(true)
     {
 #if TERRAIN_USE_SHADER == 0
         if (mShaders)
@@ -101,25 +100,17 @@ namespace Terrain
 
         mRootSceneNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
 
-        // While building the quadtree, remember leaf nodes since we need to load their layers
-        LayersRequestData data;
-        data.mPack = getShadersEnabled();
-
         mRootNode = new QuadTreeNode(this, Root, size, Ogre::Vector2(centerX, centerY), NULL);
-        buildQuadTree(mRootNode, data.mNodes);
-        //loadingListener->indicateProgress();
         mRootNode->initAabb();
-        //loadingListener->indicateProgress();
         mRootNode->initNeighbours();
-        //loadingListener->indicateProgress();
 
         Ogre::WorkQueue* wq = Ogre::Root::getSingleton().getWorkQueue();
         mWorkQueueChannel = wq->getChannel("LargeTerrain");
         wq->addRequestHandler(mWorkQueueChannel, this);
         wq->addResponseHandler(mWorkQueueChannel, this);
 
-        // Start loading layers in the background (for leaf nodes)
-        wq->addRequest(mWorkQueueChannel, REQ_ID_LAYERS, Ogre::Any(data));
+        std::vector<QuadTreeNode*> leafs(1, mRootNode);
+        queueLayerLoad(leafs);
     }
 
     DefaultWorld::~DefaultWorld()
@@ -128,60 +119,10 @@ namespace Terrain
         wq->removeRequestHandler(mWorkQueueChannel, this);
         wq->removeResponseHandler(mWorkQueueChannel, this);
 
+        for(auto node : mFreeNodes)
+            delete node;
+
         delete mRootNode;
-    }
-
-    void DefaultWorld::buildQuadTree(QuadTreeNode *node, std::vector<QuadTreeNode*>& leafs)
-    {
-        float halfSize = node->getSize()/2.f;
-
-        if (node->getSize() <= mMinBatchSize)
-        {
-            // We arrived at a leaf
-            float minZ,maxZ;
-            Ogre::Vector2 center = node->getCenter();
-            float cellWorldSize = getStorage()->getCellWorldSize();
-            if (mStorage->getMinMaxHeights(node->getSize(), center, minZ, maxZ))
-            {
-                Ogre::AxisAlignedBox bounds(Ogre::Vector3(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minZ),
-                                    Ogre::Vector3(halfSize*cellWorldSize, halfSize*cellWorldSize, maxZ));
-                convertBounds(bounds);
-                node->setBoundingBox(bounds);
-                leafs.push_back(node);
-            }
-            else
-                node->markAsDummy(); // no data available for this node, skip it
-            return;
-        }
-
-        if (node->getCenter().x - halfSize > mMaxX
-                || node->getCenter().x + halfSize < mMinX
-                || node->getCenter().y - halfSize > mMaxY
-                || node->getCenter().y + halfSize < mMinY )
-            // Out of bounds of the actual terrain - this will happen because
-            // we rounded the size up to the next power of two
-        {
-            node->markAsDummy();
-            return;
-        }
-
-        // Not a leaf, create its children
-        node->createChild(SW, halfSize, node->getCenter() - halfSize/2.f);
-        node->createChild(SE, halfSize, node->getCenter() + Ogre::Vector2(halfSize/2.f, -halfSize/2.f));
-        node->createChild(NW, halfSize, node->getCenter() + Ogre::Vector2(-halfSize/2.f, halfSize/2.f));
-        node->createChild(NE, halfSize, node->getCenter() + halfSize/2.f);
-        buildQuadTree(node->getChild(SW), leafs);
-        buildQuadTree(node->getChild(SE), leafs);
-        buildQuadTree(node->getChild(NW), leafs);
-        buildQuadTree(node->getChild(NE), leafs);
-
-        // if all children are dummy, we are also dummy
-        for (int i=0; i<4; ++i)
-        {
-            if (!node->getChild((ChildDirection)i)->isDummy())
-                return;
-        }
-        node->markAsDummy();
     }
 
     void DefaultWorld::update(const Ogre::Vector3& cameraPos)
@@ -237,9 +178,24 @@ namespace Terrain
         return mVisible;
     }
 
+    void DefaultWorld::freeNode(QuadTreeNode *node)
+    {
+        mFreeNodes.push_back(node);
+    }
+
+    QuadTreeNode *DefaultWorld::createNode(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent)
+    {
+        if(mFreeNodes.empty())
+            return new QuadTreeNode(this, dir, size, center, parent);
+        QuadTreeNode *node = mFreeNodes.back();
+        node->reset(dir, size, center, parent);
+        mFreeNodes.pop_back();
+        return node;
+    }
+
     void DefaultWorld::syncLoad()
     {
-        while (mChunksLoading || mLayerLoadPending)
+        while (mChunksLoading || mLayersLoading)
         {
             OGRE_THREAD_SLEEP(0);
             Ogre::Root::getSingleton().getWorkQueue()->processResponses();
@@ -302,7 +258,7 @@ namespace Terrain
 
             mRootNode->loadMaterials();
 
-            mLayerLoadPending = false;
+            --mLayersLoading;
         }
     }
 
@@ -313,5 +269,15 @@ namespace Terrain
 
         Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_CHUNK, Ogre::Any(data));
         ++mChunksLoading;
+    }
+
+    void DefaultWorld::queueLayerLoad(std::vector<QuadTreeNode*> &leafs)
+    {
+        LayersRequestData data;
+        data.mPack = getShadersEnabled();
+        data.mNodes = std::move(leafs);
+
+        Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_LAYERS, Ogre::Any(data));
+        ++mLayersLoading;
     }
 }

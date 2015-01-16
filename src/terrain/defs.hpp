@@ -45,6 +45,15 @@ namespace Terrain
         West = 3
     };
 
+    enum ChildDirection
+    {
+        NW = 0,
+        NE = 1,
+        SW = 2,
+        SE = 3,
+        Root
+    };
+
     struct LayerInfo
     {
         std::string mDiffuseMap;

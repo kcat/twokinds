@@ -38,7 +38,7 @@ namespace Terrain
         /// @param minBatchSize Minimum size of a terrain batch along one side (in cell units). Used for building the quad tree.
         /// @param maxBatchSize Maximum size of a terrain batch along one side (in cell units). Used when traversing the quad tree.
         DefaultWorld(Ogre::SceneManager* sceneMgr,
-                Storage* storage, int visibilityFlags, bool shaders, Alignment align, float minBatchSize, float maxBatchSize);
+                Storage* storage, int visibilityFlags, bool shaders, Alignment align, float maxBatchSize);
         ~DefaultWorld();
 
         /// Update chunk LODs according to this camera position
@@ -63,7 +63,12 @@ namespace Terrain
         /// adding or removing passes. This can only be achieved by a full rebuild.)
         virtual void applyMaterials(bool shadows, bool splitShadows);
 
-        int getMaxBatchSize() { return mMaxBatchSize; }
+        int getMaxBatchSize() const { return mMaxBatchSize; }
+
+        float getMinX() const { return mMinX; }
+        float getMaxX() const { return mMaxX; }
+        float getMinY() const { return mMinY; }
+        float getMaxY() const { return mMaxY; }
 
         /// Wait until all background loading is complete.
         void syncLoad();
@@ -83,33 +88,37 @@ namespace Terrain
         /// The number of chunks currently loading in a background thread. If 0, we have finished loading!
         int mChunksLoading;
 
+        /// The number of layer data requests. This is done when new QuadTreeNodes are created (but in a background thread)
+        int mLayersLoading;
+
         Ogre::SceneManager* mCompositeMapSceneMgr;
 
         /// Bounds in cell units
         float mMinX, mMaxX, mMinY, mMaxY;
 
-        /// Minimum size of a terrain batch along one side (in cell units)
-        float mMinBatchSize;
         /// Maximum size of a terrain batch along one side (in cell units)
         float mMaxBatchSize;
 
-        void buildQuadTree(QuadTreeNode* node, std::vector<QuadTreeNode*>& leafs);
-
-        // Are layers for leaf nodes loaded? This is done once at startup (but in a background thread)
-        bool mLayerLoadPending;
+        /// Reusable nodes
+        std::vector<QuadTreeNode*> mFreeNodes;
 
     public:
         // ----INTERNAL----
         Ogre::SceneManager* getCompositeMapSceneManager() { return mCompositeMapSceneMgr; }
 
-        bool areLayersLoaded() { return !mLayerLoadPending; }
+        bool areLayersLoaded() { return !mLayersLoading; }
 
         // Delete all quads
         void clearCompositeMapSceneManager();
         void renderCompositeMap (Ogre::TexturePtr target);
 
+        void freeNode(QuadTreeNode *node);
+        QuadTreeNode *createNode(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
+
         // Adds a WorkQueue request to load a chunk for this node in the background.
         void queueLoad (QuadTreeNode* node);
+        // Adds a WorkQueue request to load layers for these nodes in the background.
+        void queueLayerLoad (std::vector<QuadTreeNode*>& leafs);
 
     private:
         Ogre::RenderTarget* mCompositeMapRenderTarget;

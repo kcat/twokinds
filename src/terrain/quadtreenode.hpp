@@ -19,15 +19,6 @@ namespace Terrain
     class MaterialGenerator;
     struct LoadResponseData;
 
-    enum ChildDirection
-    {
-        NW = 0,
-        NE = 1,
-        SW = 2,
-        SE = 3,
-        Root
-    };
-
     enum LoadState
     {
         LS_Unloaded,
@@ -51,14 +42,21 @@ namespace Terrain
         QuadTreeNode (DefaultWorld* terrain, ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
         ~QuadTreeNode();
 
+        /// Resets the internal node properties, as if it was reallocated
+        void reset(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent);
+
+        /// Recursively frees itself and its children, disconnecting from the
+        /// graph and unloading resources before returning the node(s) to the
+        /// world for later reuse.
+        void free();
+
         /// Rebuild all materials
         void applyMaterials();
 
-        /// Initialize neighbours - do this after the quadtree is built
-        void initNeighbours();
+        /// Initialize neighbours - do this after the quadtree is (re)constructed
+        void initNeighbours(bool childrenOnly=false);
         /// Initialize bounding boxes of non-leafs by merging children bounding boxes.
-        /// Do this after the quadtree is built - note that leaf bounding boxes
-        /// need to be set first via setBoundingBox!
+        /// Do this after the quadtree is (re)constructed
         void initAabb();
 
         /// @note takes ownership of \a child
@@ -80,34 +78,25 @@ namespace Terrain
         bool hasChildren() { return mChildren[0] != 0; }
         QuadTreeNode* getChild(ChildDirection dir) { return mChildren[dir]; }
 
-        /// Get neighbour node in this direction
-        QuadTreeNode* getNeighbour (Direction dir);
-
         /// Returns our direction relative to the parent node, or Root if we are the root node.
-        ChildDirection getDirection() { return mDirection; }
-
-        /// Set bounding box in local coordinates. Should be done at load time for leaf nodes.
-        /// Other nodes can merge AABB of child nodes.
-        void setBoundingBox (const Ogre::AxisAlignedBox& box);
+        ChildDirection getDirection() const { return mDirection; }
 
         /// Get bounding box in local coordinates
-        const Ogre::AxisAlignedBox& getBoundingBox();
+        const Ogre::AxisAlignedBox& getBoundingBox() const { return mBounds; }
 
-        const Ogre::AxisAlignedBox& getWorldBoundingBox();
+        const Ogre::AxisAlignedBox& getWorldBoundingBox() const { return mWorldBounds; }
 
         DefaultWorld* getTerrain() { return mTerrain; }
 
+        void buildQuadTree(const Ogre::Vector3 &cameraPos);
+
         /// Adjust LODs for the given camera position, possibly splitting up chunks or merging them.
-        /// @param force Always choose to render this node, even if not the perfect LOD.
         /// @return Did we (or all of our children) choose to render?
         bool update (const Ogre::Vector3& cameraPos);
 
         /// Adjust index buffers of chunks to stitch together chunks of different LOD, so that cracks are avoided.
         /// Call after QuadTreeNode::update!
         void updateIndexBuffers();
-
-        /// Destroy chunks rendered by this node *and* its children (if param is true)
-        void destroyChunks(bool children);
 
         /// Get the effective LOD level if this node was rendered in one chunk
         /// with Storage::getCellVertices^2 vertices
@@ -128,8 +117,8 @@ namespace Terrain
         void prepareForCompositeMap(Ogre::TRect<float> area);
 
         /// Create a chunk for this node from the given data.
-        void load (const LoadResponseData& data);
-        void unload(bool recursive=false);
+        void load(const LoadResponseData& data);
+        void unload();
         void loadLayers (const LayerCollection& collection);
         /// This is recursive! Call it once on the root node after all leafs have loaded layers.
         void loadMaterials();

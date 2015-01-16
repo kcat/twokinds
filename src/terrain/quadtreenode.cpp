@@ -5,6 +5,7 @@
 #include <OgreSceneNode.h>
 #include <OgreMaterialManager.h>
 #include <OgreTextureManager.h>
+#include <OgreRoot.h>
 
 #include "defaultworld.hpp"
 #include "chunk.hpp"
@@ -29,7 +30,7 @@ namespace
     {
         assert(dir != Root);
 
-        const int lookupTable[4][4] =
+        const ChildDirection lookupTable[4][4] =
         {
             // NW  NE  SW  SE
             {  SW, SE, NW, NE }, // N
@@ -37,7 +38,7 @@ namespace
             {  SW, SE, NW, NE }, // S
             {  NE, NW, SE, SW }  // W
         };
-        return (ChildDirection)lookupTable[dir2][dir];
+        return lookupTable[dir2][dir];
     }
 
     bool adjacent(ChildDirection dir, Direction dir2)
@@ -63,14 +64,15 @@ namespace
 
         QuadTreeNode* nextNode;
         if (adjacent(currentNode->getDirection(), dir))
+        {
             nextNode = searchNeighbourRecursive(currentNode->getParent(), dir);
-        else
-            nextNode = currentNode->getParent();
+            if (nextNode && nextNode->hasChildren())
+                return nextNode->getChild(reflect(currentNode->getDirection(), dir));
+            return nextNode;
+        }
 
-        if (nextNode && nextNode->hasChildren())
-            return nextNode->getChild(reflect(currentNode->getDirection(), dir));
-        else
-            return NULL;
+        nextNode = currentNode->getParent();
+        return nextNode->getChild(reflect(currentNode->getDirection(), dir));
     }
 
     // Create a 2D quad
@@ -125,7 +127,6 @@ QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, float size
     , mChunk(NULL)
     , mTerrain(terrain)
 {
-    mBounds.setNull();
     for (int i=0; i<4; ++i)
         mChildren[i] = NULL;
     for (int i=0; i<4; ++i)
@@ -150,32 +151,85 @@ QuadTreeNode::QuadTreeNode(DefaultWorld* terrain, ChildDirection dir, float size
     mMaterialGenerator->enableShaders(mTerrain->getShadersEnabled());
 }
 
+void QuadTreeNode::reset(ChildDirection dir, float size, const Ogre::Vector2& center, QuadTreeNode* parent)
+{
+    mSize = size;
+    mLodLevel = Log2(mSize);
+    mDirection = dir;
+    mCenter = center;
+    mParent = parent;
+
+    mLoadState = LS_Unloaded;
+    mIsDummy = false;
+    mBounds.setNull();
+    mWorldBounds.setNull();
+    for (int i=0; i<4; ++i)
+        mChildren[i] = NULL;
+    for (int i=0; i<4; ++i)
+        mNeighbours[i] = NULL;
+
+    Ogre::Vector2 pos (0,0);
+    if (mParent)
+        pos = mParent->getCenter();
+    pos = mCenter - pos;
+    float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
+
+    Ogre::Vector3 sceneNodePos (pos.x*cellWorldSize, pos.y*cellWorldSize, 0);
+    mTerrain->convertPosition(sceneNodePos);
+
+    mSceneNode->setPosition(sceneNodePos);
+}
+
+void QuadTreeNode::free()
+{
+    unload();
+    mSceneNode->removeAllChildren();
+    Ogre::SceneNode *parent = mSceneNode->getParentSceneNode();
+    if(parent) parent->removeChild(mSceneNode);
+    if(hasChildren())
+    {
+        for (int i=0; i<4; ++i)
+        {
+            mChildren[i]->free();
+            mChildren[i] = 0;
+        }
+    }
+    mTerrain->freeNode(this);
+}
+
+
 void QuadTreeNode::createChild(ChildDirection id, float size, const Ogre::Vector2 &center)
 {
-    mChildren[id] = new QuadTreeNode(mTerrain, id, size, center, this);
+    mChildren[id] = mTerrain->createNode(id, size, center, this);
 }
 
 QuadTreeNode::~QuadTreeNode()
 {
+    Ogre::TextureManager &texMgr = Ogre::TextureManager::getSingleton();
+    std::vector<Ogre::TexturePtr> oldlist = mMaterialGenerator->getBlendmapList();
+    for(Ogre::TexturePtr &tex : oldlist)
+        texMgr.remove(tex->getName());
+
     for (int i=0; i<4; ++i)
         delete mChildren[i];
     delete mChunk;
     delete mMaterialGenerator;
+
+    mTerrain->getSceneManager()->destroySceneNode(mSceneNode);
 }
 
-QuadTreeNode* QuadTreeNode::getNeighbour(Direction dir)
+void QuadTreeNode::initNeighbours(bool childrenOnly)
 {
-    return mNeighbours[static_cast<int>(dir)];
-}
-
-void QuadTreeNode::initNeighbours()
-{
-    for (int i=0; i<4; ++i)
-        mNeighbours[i] = searchNeighbourRecursive(this, (Direction)i);
-
+    if (!childrenOnly)
+    {
+        for (int i=0; i<4; ++i)
+            mNeighbours[i] = searchNeighbourRecursive(this, (Direction)i);
+    }
     if (hasChildren())
+    {
         for (int i=0; i<4; ++i)
             mChildren[i]->initNeighbours();
+    }
 }
 
 void QuadTreeNode::initAabb()
@@ -209,26 +263,98 @@ void QuadTreeNode::initAabb()
         mBounds = Ogre::AxisAlignedBox (min, max);
         mTerrain->convertBounds(mBounds);
     }
+    else
+    {
+        float minZ, maxZ;
+        if (mTerrain->getStorage()->getMinMaxHeights(mSize, mCenter, minZ, maxZ))
+        {
+            float halfSize = mSize/2.0f;
+            Ogre::AxisAlignedBox bounds(Ogre::Vector3(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minZ),
+                                        Ogre::Vector3( halfSize*cellWorldSize,  halfSize*cellWorldSize, maxZ));
+            mTerrain->convertBounds(bounds);
+            mBounds = bounds;
+        }
+    }
     Ogre::Vector3 offset(mCenter.x*cellWorldSize, mCenter.y*cellWorldSize, 0);
     mTerrain->convertPosition(offset);
     mWorldBounds = Ogre::AxisAlignedBox(mBounds.getMinimum() + offset,
                                         mBounds.getMaximum() + offset);
 }
 
-void QuadTreeNode::setBoundingBox(const Ogre::AxisAlignedBox &box)
+void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
 {
-    mBounds = box;
+    float halfSize = mSize/2.f;
+
+    if(mWorldBounds.isNull())
+        initAabb();
+    float dist = mWorldBounds.distance(cameraPos);
+
+    // Simple LOD selection
+    /// \todo use error metrics?
+    size_t wantedLod = 0;
+    float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
+
+    if(dist > cellWorldSize*1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
+        wantedLod = Log2(dist/cellWorldSize)+1;
+
+    bool isLeaf = mSize <= 1.0f || (mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod);
+    if (isLeaf)
+    {
+        // We arrived at a leaf
+        Terrain::Storage *storage = mTerrain->getStorage();
+        float minZ,maxZ;
+        if (storage->getMinMaxHeights(mSize, mCenter, minZ, maxZ))
+        {
+            Ogre::AxisAlignedBox bounds(Ogre::Vector3(-halfSize*cellWorldSize, -halfSize*cellWorldSize, minZ),
+                                        Ogre::Vector3( halfSize*cellWorldSize,  halfSize*cellWorldSize, maxZ));
+            mTerrain->convertBounds(bounds);
+            mBounds = bounds;
+        }
+        else
+            markAsDummy(); // no data available for this node, skip it
+        return;
+    }
+
+    if (mCenter.x - halfSize > mTerrain->getMaxX()
+            || mCenter.x + halfSize < mTerrain->getMinX()
+            || mCenter.y - halfSize > mTerrain->getMaxY()
+            || mCenter.y + halfSize < mTerrain->getMinY() )
+    {
+        // Out of bounds of the actual terrain - this will happen because
+        // we rounded the size up to the next power of two
+        markAsDummy();
+        return;
+    }
+
+    // Not a leaf, create its children
+    createChild(SW, halfSize, mCenter - halfSize/2.f);
+    createChild(SE, halfSize, mCenter + Ogre::Vector2(halfSize/2.f, -halfSize/2.f));
+    createChild(NW, halfSize, mCenter + Ogre::Vector2(-halfSize/2.f, halfSize/2.f));
+    createChild(NE, halfSize, mCenter + halfSize/2.f);
+    mChildren[SW]->buildQuadTree(cameraPos);
+    mChildren[SE]->buildQuadTree(cameraPos);
+    mChildren[NW]->buildQuadTree(cameraPos);
+    mChildren[NE]->buildQuadTree(cameraPos);
+
+    // if all children are dummy, we are also dummy
+    for (int i=0; i<4; ++i)
+    {
+        if (!getChild((ChildDirection)i)->isDummy())
+        {
+            std::vector<QuadTreeNode*> leafs(mChildren+0, mChildren+4);
+            mTerrain->queueLayerLoad(leafs);
+            return;
+        }
+    }
+    markAsDummy();
+    // We're a dummy node, no need for children
+    for (int i=0; i<4; ++i)
+    {
+        mChildren[i]->free();
+        mChildren[i] = 0;
+    }
 }
 
-const Ogre::AxisAlignedBox& QuadTreeNode::getBoundingBox()
-{
-    return mBounds;
-}
-
-const Ogre::AxisAlignedBox& QuadTreeNode::getWorldBoundingBox()
-{
-    return mWorldBounds;
-}
 
 bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
 {
@@ -251,21 +377,10 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
     size_t wantedLod = 0;
     float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
 
-    if (dist > cellWorldSize*64)
-        wantedLod = 6;
-    else if (dist > cellWorldSize*32)
-        wantedLod = 5;
-    else if (dist > cellWorldSize*12)
-        wantedLod = 4;
-    else if (dist > cellWorldSize*5)
-        wantedLod = 3;
-    else if (dist > cellWorldSize*2)
-        wantedLod = 2;
-    else if (dist > cellWorldSize * 1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
-        wantedLod = 1;
+    if(dist > cellWorldSize*1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
+        wantedLod = Log2(dist/cellWorldSize)+1;
 
     bool wantToDisplay = mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod;
-
     if (wantToDisplay)
     {
         // Wanted LOD is small enough to render this node in one chunk
@@ -301,7 +416,16 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
             if (!mChunk->getVisible() && hasChildren())
             {
                 for (int i=0; i<4; ++i)
-                    mChildren[i]->unload(true);
+                {
+                    mChildren[i]->free();
+                    mChildren[i] = 0;
+                }
+                // Children went away. Make sure our neighbours' children know
+                for (int i=0; i<4; ++i)
+                {
+                    if(mNeighbours[i])
+                        mNeighbours[i]->initNeighbours(true);
+                }
             }
             mChunk->setVisible(true);
 
@@ -311,44 +435,56 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
     }
 
     // We do not want to display this node - delegate to children if they are already loaded
-    if (!wantToDisplay && hasChildren())
+    if(!hasChildren())
     {
-        if (mChunk)
+        buildQuadTree(cameraPos);
+        if(!hasChildren())
         {
-            // Are children already loaded?
-            bool childrenLoaded = true;
-            for (int i=0; i<4; ++i)
-                if (!mChildren[i]->update(cameraPos))
-                    childrenLoaded = false;
+            markAsDummy();
+            return false;
+        }
+        initAabb();
+        initNeighbours(true);
+        // Inform our neighbours that their children may have new neighbours
+        for(int i=0; i<4; ++i)
+        {
+            if(mNeighbours[i])
+                mNeighbours[i]->initNeighbours(true);
+        }
+    }
 
-            if (!childrenLoaded)
-            {
-                mChunk->setVisible(true);
-                // Make sure child scene nodes are detached until all children are loaded
-                mSceneNode->removeAllChildren();
-            }
-            else
-            {
-                // Delegation went well, we can unload now
-                unload();
+    if (mChunk)
+    {
+        // Are children already loaded?
+        bool childrenLoaded = true;
+        for (int i=0; i<4; ++i)
+            if (!mChildren[i]->update(cameraPos))
+                childrenLoaded = false;
 
-                for (int i=0; i<4; ++i)
-                {
-                    if (!mChildren[i]->getSceneNode()->isInSceneGraph())
-                        mSceneNode->addChild(mChildren[i]->getSceneNode());
-                }
-            }
-            return true;
+        if (!childrenLoaded)
+        {
+            mChunk->setVisible(true);
+            // Make sure child scene nodes are detached until all children are loaded
+            mSceneNode->removeAllChildren();
         }
         else
         {
-            bool success = true;
+            // Delegation went well, we can unload now
+            unload();
+
             for (int i=0; i<4; ++i)
-                success = mChildren[i]->update(cameraPos) & success;
-            return success;
+            {
+                if (!mChildren[i]->getSceneNode()->isInSceneGraph())
+                    mSceneNode->addChild(mChildren[i]->getSceneNode());
+            }
         }
+        return true;
     }
-    return false;
+
+    bool success = true;
+    for (int i=0; i<4; ++i)
+        success = mChildren[i]->update(cameraPos) & success;
+    return success;
 }
 
 void QuadTreeNode::load(const LoadResponseData &data)
@@ -365,7 +501,7 @@ void QuadTreeNode::load(const LoadResponseData &data)
 
     if (mTerrain->areLayersLoaded())
     {
-        if (mSize == 1)
+        if (mSize <= 1)
         {
             mChunk->setMaterial(mMaterialGenerator->generate());
         }
@@ -382,7 +518,7 @@ void QuadTreeNode::load(const LoadResponseData &data)
     mLoadState = LS_Loaded;
 }
 
-void QuadTreeNode::unload(bool recursive)
+void QuadTreeNode::unload()
 {
     if (mChunk)
     {
@@ -400,12 +536,6 @@ void QuadTreeNode::unload(bool recursive)
         // Do *not* set this when we are still loading!
         mLoadState = LS_Unloaded;
     }
-
-    if (recursive && hasChildren())
-    {
-        for (int i=0; i<4; ++i)
-            mChildren[i]->unload(true);
-    }
 }
 
 void QuadTreeNode::updateIndexBuffers()
@@ -419,23 +549,26 @@ void QuadTreeNode::updateIndexBuffers()
 
         for (int i=0; i<4; ++i)
         {
-            QuadTreeNode* neighbour = getNeighbour((Direction)i);
+            QuadTreeNode* neighbour = mNeighbours[i];
 
             // If the neighbour isn't currently rendering itself,
             // go up until we find one. NOTE: We don't need to go down,
             // because in that case neighbour's detail would be higher than
             // our detail and the neighbour would handle stitching by itself.
+            // FIXME: If an immediate neighbour isn't rendering, none of its
+            // parents should be either. Could just skip?
             while (neighbour && !neighbour->hasChunk())
                 neighbour = neighbour->getParent();
             size_t lod = 0;
             if (neighbour)
                 lod = neighbour->getActualLodLevel();
-            if (lod <= ourLod) // We only need to worry about neighbours less detailed than we are -
-                lod = 0;         // neighbours with more detail will do the stitching themselves
-            // Use 4 bits for each LOD delta
-            if (lod > 0)
+            // We only need to worry about neighbours less detailed than we are -
+            // neighbours with more detail will do the stitching themselves
+            if (lod > ourLod)
             {
+                // Use 4 bits for each LOD delta
                 assert (lod - ourLod < (1 << 4));
+                lod = std::min<size_t>((1<<4)-1, lod - ourLod) + ourLod;
                 flags |= static_cast<unsigned int>(lod - ourLod) << (4*i);
             }
         }
@@ -465,13 +598,15 @@ void QuadTreeNode::loadLayers(const LayerCollection& collection)
 {
     assert (!mMaterialGenerator->hasLayers());
 
+    Ogre::TextureManager &texMgr = Ogre::TextureManager::getSingleton();
+
     std::vector<Ogre::TexturePtr> blendTextures;
     for (std::vector<Ogre::PixelBox>::const_iterator it = collection.mBlendmaps.begin(); it != collection.mBlendmaps.end(); ++it)
     {
         // TODO: clean up blend textures on destruction
         static int count=0;
-        Ogre::TexturePtr map = Ogre::TextureManager::getSingleton().createManual("terrain/blend/"
-            + Ogre::StringConverter::toString(count++), Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
+        Ogre::TexturePtr map = texMgr.createManual("terrain/blend/" + Ogre::StringConverter::toString(count++),
+            Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
             Ogre::TEX_TYPE_2D, it->getWidth(), it->getHeight(), 0, it->format);
 
         Ogre::DataStreamPtr stream(new Ogre::MemoryDataStream(it->data, it->getWidth()*it->getHeight()*Ogre::PixelUtil::getNumElemBytes(it->format), true));
@@ -479,8 +614,11 @@ void QuadTreeNode::loadLayers(const LayerCollection& collection)
         blendTextures.push_back(map);
     }
 
+    std::vector<Ogre::TexturePtr> oldlist = mMaterialGenerator->getBlendmapList();
     mMaterialGenerator->setLayerList(collection.mLayers);
     mMaterialGenerator->setBlendmapList(blendTextures);
+    for(Ogre::TexturePtr &tex : oldlist)
+        texMgr.remove(tex->getName());
 }
 
 void QuadTreeNode::loadMaterials()
@@ -497,7 +635,7 @@ void QuadTreeNode::loadMaterials()
 
     if (mChunk)
     {
-        if (mSize == 1)
+        if (mSize <= 1)
         {
             mChunk->setMaterial(mMaterialGenerator->generate());
         }
@@ -525,10 +663,8 @@ void QuadTreeNode::prepareForCompositeMap(Ogre::TRect<float> area)
         makeQuad(sceneMgr, area.left, area.top, area.right, area.bottom, matGen.generateForCompositeMapRTT());
         return;
     }
-    if (mSize > 1)
+    if (hasChildren())
     {
-        assert(hasChildren());
-
         // 0,0 -------- 1,0
         //  |     |      |
         //  |-----|------|
