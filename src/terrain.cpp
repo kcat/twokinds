@@ -265,27 +265,7 @@ void TerrainStorage::getBlendmaps(float chunkSize, const Ogre::Vector2& chunkCen
                                   std::vector<Ogre::PixelBox>& blendmaps,
                                   std::vector<Terrain::LayerInfo>& layerList)
 {
-    Terrain::LayerInfo layerinf{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", true, true};
-    layerList.push_back(std::move(layerinf));
-
-#if 0
-    int channels = (pack ? 4 : 1);
-    Ogre::PixelFormat format = (pack ? Ogre::PF_A8B8G8R8 : Ogre::PF_A8);
-    Ogre::uchar *pixdata = OGRE_ALLOC_T(Ogre::uchar, terrain_size*terrain_size*channels, Ogre::MEMCATEGORY_GENERAL);
-    memset(pixdata, 0, TERRAIN_SIZE*TERRAIN_SIZE*channels);
-
-    for(int y = 0;y < TERRAIN_SIZE;++y)
-    {
-        for(int x = 0;x < TERRAIN_SIZE;++x)
-        {
-            for(int c = 0;c < channels;c++)
-                pixdata[(y*TERRAIN_SIZE + x)*channels + c] = 255;
-        }
-    }
-    Ogre::PixelBox pixbox(TERRAIN_SIZE, TERRAIN_SIZE, 1, format, pixdata);
-
-    blendmaps.push_back(std::move(pixbox));
-#endif
+    layerList.push_back(Terrain::LayerInfo{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", false, false});
 }
 
 void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nodes, std::vector<Terrain::LayerCollection>& out, bool pack)
@@ -295,29 +275,8 @@ void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nod
         Terrain::LayerCollection layers;
         layers.mTarget = node;
 
-        {
-            Terrain::LayerInfo layerinf{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", true, true};
-            layers.mLayers.push_back(std::move(layerinf));
+        getBlendmaps(node->getSize(), node->getCenter(), pack, layers.mBlendmaps, layers.mLayers);
 
-#if 0
-            int channels = (pack ? 4 : 1);
-            Ogre::PixelFormat format = (pack ? Ogre::PF_A8B8G8R8 : Ogre::PF_A8);
-            Ogre::uchar *pixdata = OGRE_ALLOC_T(Ogre::uchar, terrain_size*terrain_size*channels, Ogre::MEMCATEGORY_GENERAL);
-            memset(pixdata, 0, TERRAIN_SIZE*TERRAIN_SIZE*channels);
-
-            for(int y = 0;y < TERRAIN_SIZE;++y)
-            {
-                for(int x = 0;x < TERRAIN_SIZE;++x)
-                {
-                    for(int c = 0;c < channels;c++)
-                        pixdata[(y*TERRAIN_SIZE + x)*channels + c] = 255;
-                }
-            }
-            Ogre::PixelBox pixbox(TERRAIN_SIZE, TERRAIN_SIZE, 1, format, pixdata);
-
-            layers.mBlendmaps.push_back(std::move(pixbox));
-#endif
-        }
         out.push_back(std::move(layers));
     }
 }
