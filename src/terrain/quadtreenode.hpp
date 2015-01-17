@@ -59,10 +59,10 @@ namespace Terrain
         /// Do this after the quadtree is (re)constructed
         void initAabb();
 
-        /// Updates the node's neighbour bordering the given direction, and
-        /// updates the children of the same direction (e.g. if dir=E, id1 and
-        /// id2 will be NE and SE)
-        void updateNeighbour(Direction dir, ChildDirection id1, ChildDirection id2, QuadTreeNode *node);
+        /// Updates the neighbour bordering the given direction with the given
+        /// node, and updates the descendants on the same border (e.g. if
+        /// dir=East, all NE and SE children will be updated too).
+        void updateNeighbour(Direction dir, QuadTreeNode *node);
 
         /// @note takes ownership of \a child
         void createChild (ChildDirection id, int size, const Ogre::Vector2& center);

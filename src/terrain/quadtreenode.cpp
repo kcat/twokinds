@@ -249,13 +249,19 @@ void QuadTreeNode::initNeighbours(bool childrenOnly)
     }
 }
 
-void QuadTreeNode::updateNeighbour(Direction dir, ChildDirection id1, ChildDirection id2, QuadTreeNode *node)
+void QuadTreeNode::updateNeighbour(Direction dir, QuadTreeNode *node)
 {
     mNeighbours[dir] = node;
     if(hasChildren())
     {
-        mChildren[id1]->updateNeighbour(dir, id1, id2, node);
-        mChildren[id2]->updateNeighbour(dir, id1, id2, node);
+        const ChildDirection child_dirs[][2] = {
+            { NW, NE }, // North
+            { NE, SE }, // East
+            { SE, SW }, // South
+            { SW, NW }, // West
+        };
+        mChildren[child_dirs[dir][0]]->updateNeighbour(dir, node);
+        mChildren[child_dirs[dir][1]]->updateNeighbour(dir, node);
     }
 }
 
@@ -467,10 +473,10 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
                     mChildren[i] = 0;
                 }
                 // Children went away. Make sure our neighbours' children know
-                if(mNeighbours[North]) mNeighbours[North]->updateNeighbour(South, SE, SW, this);
-                if(mNeighbours[East ]) mNeighbours[East ]->updateNeighbour(West,  SW, NW, this);
-                if(mNeighbours[South]) mNeighbours[South]->updateNeighbour(North, NW, NE, this);
-                if(mNeighbours[West ]) mNeighbours[West ]->updateNeighbour(East,  NE, SE, this);
+                if(mNeighbours[North]) mNeighbours[North]->updateNeighbour(South, this);
+                if(mNeighbours[East ]) mNeighbours[East ]->updateNeighbour(West,  this);
+                if(mNeighbours[South]) mNeighbours[South]->updateNeighbour(North, this);
+                if(mNeighbours[West ]) mNeighbours[West ]->updateNeighbour(East,  this);
             }
             mChunk->setVisible(true);
 
