@@ -247,7 +247,6 @@ namespace Terrain
             const LayerRequestData requestData = Ogre::any_cast<LayerRequestData>(res->getRequest()->getData());
 
             requestData.mNode->loadLayers(data->mBlendmaps, data->mLayers);
-            requestData.mNode->loadMaterials();
 
             delete data;
 

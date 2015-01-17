@@ -125,14 +125,14 @@ namespace Terrain
         void load(const LoadResponseData& data);
         void unload();
         void loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, const std::vector<LayerInfo> &layerList);
-        /// This is recursive! Call it once on the root node after all leafs have loaded layers.
-        void loadMaterials();
+        void unloadLayers();
 
     private:
         // Stored here for convenience in case we need layer list again
         MaterialGenerator* mMaterialGenerator;
 
         LoadState mChunkLoadState;
+        LoadState mLayerLoadState;
 
         bool mIsDummy;
         int mSize;
@@ -155,6 +155,11 @@ namespace Terrain
         Ogre::TexturePtr mCompositeMap;
 
         void ensureCompositeMap();
+
+        void loadMaterials();
+
+        /// Waits for any pending loads on this cell to complete
+        void syncLoad();
     };
 
 }
