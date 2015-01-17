@@ -197,8 +197,8 @@ void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& max
 
 bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
 {
-    min = -TERRAIN_WORLD_SIZE;
-    max =  TERRAIN_WORLD_SIZE;
+    min = -TERRAIN_WORLD_HEIGHT;
+    max =  TERRAIN_WORLD_HEIGHT;
     return true;
 }
 
