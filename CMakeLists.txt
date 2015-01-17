@@ -44,6 +44,7 @@ set(CMAKE_DEBUG_POSTFIX "_d")
 
 find_package(OGRE REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(MyGUI REQUIRED)
 find_package(PhysFS REQUIRED)
 find_package(libNoise REQUIRED)
 
@@ -135,6 +136,7 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
     ${OGRE_Terrain_INCLUDE_DIRS}
     ${OGRE_Paging_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIR}
+    ${MYGUI_INCLUDE_DIRS}
     ${PHYSFS_INCLUDE_DIR}
     ${LIBNOISE_INCLUDE_DIRS}
 )
@@ -144,6 +146,7 @@ target_link_libraries(twokinds
     ${OGRE_Terrain_LIBRARIES}
     ${OGRE_Paging_LIBRARIES}
     ${SDL2_LIBRARY}
+    ${MYGUI_LIBRARIES}
     ${PHYSFS_LIBRARY}
     ${LIBNOISE_LIBRARIES}
 )
