@@ -51,12 +51,6 @@ find_package(libNoise REQUIRED)
 if(NOT OGRE_RTShaderSystem_FOUND)
     message(FATAL_ERROR "Failed to find Ogre RTShaderSystem component")
 endif()
-if(NOT OGRE_Terrain_FOUND)
-    message(FATAL_ERROR "Failed to find Ogre Terrain component")
-endif()
-if(NOT OGRE_Paging_FOUND)
-    message(FATAL_ERROR "Failed to find Ogre Paging component")
-endif()
 
 # Find Boost
 if(NOT OGRE_BUILD_PLATFORM_IPHONE)
@@ -133,8 +127,6 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
     "${twokinds_SOURCE_DIR}/src"
     ${OGRE_INCLUDE_DIRS}
     ${OGRE_RTShaderSystem_INCLUDE_DIRS}
-    ${OGRE_Terrain_INCLUDE_DIRS}
-    ${OGRE_Paging_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIR}
     ${MYGUI_INCLUDE_DIRS}
     ${PHYSFS_INCLUDE_DIR}
@@ -143,8 +135,6 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
 target_link_libraries(twokinds
     ${OGRE_LIBRARIES}
     ${OGRE_RTShaderSystem_LIBRARIES}
-    ${OGRE_Terrain_LIBRARIES}
-    ${OGRE_Paging_LIBRARIES}
     ${SDL2_LIBRARY}
     ${MYGUI_LIBRARIES}
     ${PHYSFS_LIBRARY}

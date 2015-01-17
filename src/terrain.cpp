@@ -2,14 +2,8 @@
 #include "terrain.hpp"
 
 #include <OgreRoot.h>
-#include <OgrePageManager.h>
-#include <OgrePage.h>
-
-#include <OgreTerrain.h>
-#include <OgreTerrainGroup.h>
-#include <OgreTerrainPaging.h>
-#include <OgreTerrainPagedWorldSection.h>
 #include <OgreLogManager.h>
+#include <OgreCamera.h>
 
 #include "noiseutils/noiseutils.h"
 
@@ -132,6 +126,7 @@ class TerrainStorage : public Terrain::Storage
     noise::module::ScaleBias mFieldsTerrain;
     noise::module::Billow mBaseSeaTerrain;
     noise::module::ScaleBias mSeaTerrain;
+
     noise::module::Select mFinalTerrain;
 
 public:
