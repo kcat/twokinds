@@ -190,6 +190,12 @@ void QuadTreeNode::free()
     unload();
     unloadLayers();
 
+    if(!mMaterial.isNull())
+    {
+        Ogre::MaterialManager::getSingleton().remove(mMaterial->getName());
+        mMaterial.setNull();
+    }
+
     mSceneNode->removeAllChildren();
     Ogre::SceneNode *parent = mSceneNode->getParentSceneNode();
     if(parent) parent->removeChild(mSceneNode);
@@ -211,6 +217,12 @@ QuadTreeNode::~QuadTreeNode()
 
     unload();
     unloadLayers();
+
+    if(!mMaterial.isNull())
+    {
+        Ogre::MaterialManager::getSingleton().remove(mMaterial->getName());
+        mMaterial.setNull();
+    }
 
     delete mMaterialGenerator;
 
@@ -685,7 +697,13 @@ void QuadTreeNode::prepareForCompositeMap(Ogre::TRect<float> area)
         std::vector<LayerInfo> layer;
         layer.push_back(mTerrain->getStorage()->getDefaultLayer());
         matGen.setLayerList(layer);
-        makeQuad(sceneMgr, area.left, area.top, area.right, area.bottom, matGen.generateForCompositeMapRTT());
+        if(!mMaterial.isNull())
+        {
+            Ogre::MaterialManager::getSingleton().remove(mMaterial->getName());
+            mMaterial.setNull();
+        }
+        mMaterial = matGen.generateForCompositeMapRTT();
+        makeQuad(sceneMgr, area.left, area.top, area.right, area.bottom, mMaterial);
         return;
     }
     if (hasChildren())
@@ -705,9 +723,13 @@ void QuadTreeNode::prepareForCompositeMap(Ogre::TRect<float> area)
     }
     else
     {
-        // TODO: when to destroy?
-        Ogre::MaterialPtr material = mMaterialGenerator->generateForCompositeMapRTT();
-        makeQuad(sceneMgr, area.left, area.top, area.right, area.bottom, material);
+        if(!mMaterial.isNull())
+        {
+            Ogre::MaterialManager::getSingleton().remove(mMaterial->getName());
+            mMaterial.setNull();
+        }
+        mMaterial = mMaterialGenerator->generateForCompositeMapRTT();
+        makeQuad(sceneMgr, area.left, area.top, area.right, area.bottom, mMaterial);
     }
 }
 

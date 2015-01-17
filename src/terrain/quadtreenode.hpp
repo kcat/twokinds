@@ -152,6 +152,7 @@ namespace Terrain
 
         DefaultWorld* mTerrain;
 
+        Ogre::MaterialPtr mMaterial;
         Ogre::TexturePtr mCompositeMap;
 
         void ensureCompositeMap();
