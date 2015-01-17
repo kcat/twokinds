@@ -161,6 +161,7 @@ public:
 TerrainStorage::TerrainStorage()
 {
     mHeightmapModule.GetImage().load("tk-heightmap.png", "Terrain");
+    mHeightmapModule.GetImage().flipAroundX();
     mHeightmapModule.SetFrequency(32.0);
 
     float fields_base = 16.0f/255.0f * 2.0f - 1.0f;
