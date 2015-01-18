@@ -366,7 +366,7 @@ bool Engine::go(void)
         Ogre::ConfigFile cf;
         cf.load("resources.cfg");
 
-        Ogre::StringVector paths = cf.getMultiSetting("path", "General");
+        Ogre::StringVector paths = cf.getMultiSetting("source", "General");
         for(const auto &path : paths)
             PhysFSFactory::getSingleton().Mount(path.c_str());
 
@@ -376,8 +376,6 @@ bool Engine::go(void)
         {
             Ogre::String secName = seci.peekNextKey();
             Ogre::ConfigFile::SettingsMultiMap *settings = seci.getNext();
-            if(secName == "General")
-                continue;
             for(const auto &i : *settings)
             {
                 if(i.first != "path")

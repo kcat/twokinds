@@ -1,6 +1,6 @@
 [General]
-path=${DATA_ROOT}/RTShaderLib.zip
-path=${DATA_ROOT}
+source=${DATA_ROOT}/RTShaderLib.zip
+source=${DATA_ROOT}
 
 [Shaders]
 path=/RTShaderLib/HLSL
