@@ -24,6 +24,9 @@
 #endif
 #include <OgreLogManager.h>
 
+#include <MyGUI.h>
+#include <MyGUI_OgrePlatform.h>
+
 #include <SDL.h>
 #include <SDL_syswm.h>
 
@@ -112,12 +115,27 @@ Engine::Engine(void)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
   , mViewport(nullptr)
+  , mPlatform(nullptr)
+  , mGui(nullptr)
 {
 }
 
 Engine::~Engine(void)
 {
     World::get().deinitialize();
+
+    if(mGui)
+    {
+        mGui->shutdown();
+        delete mGui;
+        mGui = nullptr;
+    }
+    if(mPlatform)
+    {
+        mPlatform->shutdown();
+        delete mPlatform;
+        mPlatform = nullptr;
+    }
 
     if(mRoot)
     {
@@ -428,6 +446,12 @@ bool Engine::go(void)
     mCamera->setFarClipDistance(50000.0f);
     if(mRoot->getRenderSystem()->getCapabilities()->hasCapability(Ogre::RSC_INFINITE_FAR_PLANE))
         mCamera->setFarClipDistance(0.0f);   // enable infinite far clip distance if we can
+
+    // Setup GUI subsystem
+    mPlatform = new MyGUI::OgrePlatform();
+    mPlatform->initialise(mWindow, mSceneMgr);
+    mGui = new MyGUI::Gui();
+    mGui->initialise();
 
     /* Make a light so we can see things */
     mSceneMgr->setAmbientLight(Ogre::ColourValue(137.0f/255.0f, 140.0f/255.0f, 160.0f/255.0f));

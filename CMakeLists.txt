@@ -136,6 +136,7 @@ target_link_libraries(twokinds
     ${OGRE_LIBRARIES}
     ${OGRE_RTShaderSystem_LIBRARIES}
     ${SDL2_LIBRARY}
+    ${MYGUI_PLATFORM_LIBRARIES}
     ${MYGUI_LIBRARIES}
     ${PHYSFS_LIBRARY}
     ${LIBNOISE_LIBRARIES}
