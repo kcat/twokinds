@@ -488,8 +488,9 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     if(keystate[SDL_SCANCODE_ESCAPE])
         return false;
 
+    float frametime = std::min<Ogre::Real>(1.0f/20.0f, evt.timeSinceLastFrame);
     Ogre::Vector3 movedir(0.0f);
-    Ogre::Real speed = 60.0f * evt.timeSinceLastFrame;
+    Ogre::Real speed = 60.0f * frametime;
     if(keystate[SDL_SCANCODE_LSHIFT])
         speed *= 2.0f;
 
@@ -503,7 +504,7 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
         movedir.x += +1.0f;
 
     Ogre::Vector3 pos = mCamera->getPosition();
-    Ogre::Quaternion ori = mCamera->getDerivedOrientation();
+    Ogre::Quaternion ori = mCamera->getOrientation();
     pos += (ori*movedir)*speed;
     pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
     mCamera->setPosition(pos);
