@@ -23,7 +23,10 @@ class PhysFileStream : public Ogre::DataStream {
 
 public:
     PhysFileStream(PHYSFS_File *file) : mFile(file)
-    { }
+    {
+        PHYSFS_sint64 len = PHYSFS_fileLength(mFile);
+        if(len > 0) mSize = len;
+    }
     virtual ~PhysFileStream()
     { close(); }
 
