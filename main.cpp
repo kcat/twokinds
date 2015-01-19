@@ -45,9 +45,8 @@ static void DoErrorMessage(const char *msg, const char *title)
 
 int main(int argc, char *argv[])
 {
-    TK::Engine app;
-
     try {
+        TK::Engine app;
         if(!app.parseOptions(argc, argv))
             return 0;
         app.go();
