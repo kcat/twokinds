@@ -94,6 +94,7 @@ configure_file("${twokinds_SOURCE_DIR}/resources.cfg.in"
 
 set(HDRS src/archives/physfs.hpp
          src/noiseutils/noiseutils.h
+         src/gui/gui.hpp
          src/terrain/buffercache.hpp
          src/terrain/chunk.hpp
          src/terrain/defaultworld.hpp
@@ -109,6 +110,7 @@ set(HDRS src/archives/physfs.hpp
 
 set(SRCS src/archives/physfs.cpp
          src/noiseutils/noiseutils.cpp
+         src/gui/gui.cpp
          src/terrain/buffercache.cpp
          src/terrain/chunk.cpp
          src/terrain/defaultworld.cpp

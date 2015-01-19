@@ -18,16 +18,10 @@ namespace Ogre
     class Viewport;
 }
 
-namespace MyGUI
-{
-    class OgrePlatform;
-    class Gui;
-}
-
 namespace TK
 {
 
-class TerrainPageProvider;
+class Gui;
 
 class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 {
@@ -39,8 +33,7 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::Camera *mCamera;
     Ogre::Viewport *mViewport; // Not used with Ogre 2.0!
 
-    MyGUI::OgrePlatform *mPlatform;
-    MyGUI::Gui *mGui;
+    Gui *mGui;
 
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 

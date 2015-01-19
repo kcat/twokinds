@@ -24,13 +24,11 @@
 #endif
 #include <OgreLogManager.h>
 
-#include <MyGUI.h>
-#include <MyGUI_OgrePlatform.h>
-
 #include <SDL.h>
 #include <SDL_syswm.h>
 
 #include "archives/physfs.hpp"
+#include "gui/gui.hpp"
 #include "terrain.hpp"
 
 
@@ -115,7 +113,6 @@ Engine::Engine(void)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
   , mViewport(nullptr)
-  , mPlatform(nullptr)
   , mGui(nullptr)
 {
 }
@@ -124,18 +121,8 @@ Engine::~Engine(void)
 {
     World::get().deinitialize();
 
-    if(mGui)
-    {
-        mGui->shutdown();
-        delete mGui;
-        mGui = nullptr;
-    }
-    if(mPlatform)
-    {
-        mPlatform->shutdown();
-        delete mPlatform;
-        mPlatform = nullptr;
-    }
+    delete mGui;
+    mGui = nullptr;
 
     if(mRoot)
     {
@@ -439,24 +426,7 @@ bool Engine::go(void)
 #endif
 
     // Setup GUI subsystem
-    try {
-        mPlatform = new MyGUI::OgrePlatform();
-        mPlatform->initialise(mWindow, mSceneMgr, "GUI");
-    }
-    catch(...) {
-        delete mPlatform;
-        mPlatform = nullptr;
-        throw;
-    }
-    try {
-        mGui = new MyGUI::Gui();
-        mGui->initialise();
-    }
-    catch(...) {
-        delete mGui;
-        mGui = nullptr;
-        throw;
-    }
+    mGui = new Gui(mWindow, mSceneMgr);
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
