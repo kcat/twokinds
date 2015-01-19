@@ -437,6 +437,26 @@ bool Engine::go(void)
     mViewport->setMaterialScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 #endif
 
+    // Setup GUI subsystem
+    try {
+        mPlatform = new MyGUI::OgrePlatform();
+        mPlatform->initialise(mWindow, mSceneMgr, "GUI");
+    }
+    catch(...) {
+        delete mPlatform;
+        mPlatform = nullptr;
+        throw;
+    }
+    try {
+        mGui = new MyGUI::Gui();
+        mGui->initialise();
+    }
+    catch(...) {
+        delete mGui;
+        mGui = nullptr;
+        throw;
+    }
+
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
     mCamera->setPosition(Ogre::Vector3(0.0f, 0.0f, 0.0f));
@@ -444,12 +464,6 @@ bool Engine::go(void)
     mCamera->setFarClipDistance(50000.0f);
     if(mRoot->getRenderSystem()->getCapabilities()->hasCapability(Ogre::RSC_INFINITE_FAR_PLANE))
         mCamera->setFarClipDistance(0.0f);   // enable infinite far clip distance if we can
-
-    // Setup GUI subsystem
-    mPlatform = new MyGUI::OgrePlatform();
-    mPlatform->initialise(mWindow, mSceneMgr);
-    mGui = new MyGUI::Gui();
-    mGui->initialise();
 
     /* Make a light so we can see things */
     mSceneMgr->setAmbientLight(Ogre::ColourValue(137.0f/255.0f, 140.0f/255.0f, 160.0f/255.0f));
