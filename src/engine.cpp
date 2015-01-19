@@ -258,6 +258,48 @@ void Engine::handleWindowEvent(const SDL_WindowEvent &evt)
     }
 }
 
+void Engine::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
+{
+    mGui->mouseMoved(evt.x, evt.y, 0);
+
+    /* HACK: mouse moves the camera around */
+    if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
+    {
+        static float x=0.0f, y=0.0f;
+        /* Rotation (x motion rotates around y, y motion rotates around x) */
+        x += evt.yrel * 0.1f;
+        y += evt.xrel * 0.1f;
+
+        Ogre::Matrix3 mat3;
+        mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+        mCamera->setOrientation(mat3);
+    }
+}
+
+void Engine::handleMouseButtonEvent(const SDL_MouseButtonEvent &evt)
+{
+    if(evt.state == SDL_PRESSED)
+        mGui->mousePressed(evt.x, evt.y, evt.button);
+    else if(evt.state == SDL_RELEASED)
+        mGui->mouseReleased(evt.x, evt.y, evt.button);
+}
+
+void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
+{
+    if(evt.state == SDL_PRESSED)
+    {
+        if(!evt.repeat)
+            mGui->injectKeyPress(evt.keysym.scancode, "");
+    }
+    else if(evt.state == SDL_RELEASED)
+        mGui->injectKeyRelease(evt.keysym.scancode);
+}
+
+void Engine::handleTextInputEvent(const SDL_TextInputEvent &evt)
+{
+    mGui->injectKeyPress(0, evt.text);
+}
+
 bool Engine::pumpEvents()
 {
     SDL_PumpEvents();
@@ -272,22 +314,19 @@ bool Engine::pumpEvents()
             break;
 
         case SDL_MOUSEMOTION:
-            /* Left button */
-            if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
-            {
-                static float x=0.0f, y=0.0f;
-                /* Rotation (x motion rotates around y, y motion rotates around x) */
-                x += evt.motion.yrel * 0.1f;
-                y += evt.motion.xrel * 0.1f;
-
-                Ogre::Matrix3 mat3;
-                mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-                mCamera->setOrientation(mat3);
-            }
+            handleMouseMotionEvent(evt.motion);
+            break;
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+            handleMouseButtonEvent(evt.button);
             break;
 
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+            handleKeyboardEvent(evt.key);
+            break;
+        case SDL_TEXTINPUT:
+            handleTextInputEvent(evt.text);
             break;
 
         case SDL_QUIT:

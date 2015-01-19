@@ -6,6 +6,10 @@
 
 struct SDL_Window;
 struct SDL_WindowEvent;
+struct SDL_MouseMotionEvent;
+struct SDL_MouseButtonEvent;
+struct SDL_KeyboardEvent;
+struct SDL_TextInputEvent;
 
 namespace Ogre
 {
@@ -38,6 +42,10 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
+    void handleMouseMotionEvent(const SDL_MouseMotionEvent &evt);
+    void handleMouseButtonEvent(const SDL_MouseButtonEvent &evt);
+    void handleKeyboardEvent(const SDL_KeyboardEvent &evt);
+    void handleTextInputEvent(const SDL_TextInputEvent &evt);
     bool pumpEvents();
 
     virtual bool frameStarted(const Ogre::FrameEvent &evt);
