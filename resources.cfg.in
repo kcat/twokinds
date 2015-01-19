@@ -1,5 +1,6 @@
 [General]
 source=${DATA_ROOT}/RTShaderLib.zip
+source=${DATA_ROOT}/MyGUI_Media.zip
 source=${DATA_ROOT}
 
 [Shaders]
@@ -18,3 +19,6 @@ path=/terrain
 
 [Meshes]
 path=/meshes
+
+[GUI]
+path=/MyGUI_Media

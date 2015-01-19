@@ -361,6 +361,7 @@ bool Engine::go(void)
         resGrpMgr.createResourceGroup("Textures");
         resGrpMgr.createResourceGroup("Meshes");
         resGrpMgr.createResourceGroup("Terrain");
+        resGrpMgr.createResourceGroup("GUI");
 
         // Load resource paths from config file
         Ogre::ConfigFile cf;
