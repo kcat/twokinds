@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 #include <OgreRoot.h>
 #include <OgreSceneManager.h>
@@ -530,6 +531,11 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     pos += (ori*movedir)*speed;
     pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
     mCamera->setPosition(pos);
+
+    std::stringstream status;
+    status << "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
+    World::get().getStatus(status);
+    mGui->updateStatus(status.str());
 
     return true;
 }

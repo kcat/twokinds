@@ -1,6 +1,8 @@
 #ifndef TERRAIN_HPP
 #define TERRAIN_HPP
 
+#include <sstream>
+
 namespace Ogre
 {
     class Vector3;
@@ -31,6 +33,8 @@ public:
 
     float getHeightAt(const Ogre::Vector3 &pos) const;
     void update(const Ogre::Vector3 &cameraPos);
+
+    void getStatus(std::stringstream &status) const;
 
     static World &get() { return sWorld; }
     static World *getPtr() { return &sWorld; }

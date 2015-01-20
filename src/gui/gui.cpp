@@ -210,10 +210,20 @@ Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
     }
 
     MyGUI::PointerManager::getInstance().setVisible(false);
+    mStatusMessages = mGui->createWidgetReal<MyGUI::TextBox>("TextBox",
+        MyGUI::FloatCoord(0.f, 0.f, 1.f, 0.25f), MyGUI::Align::Default,
+        "Overlapped"
+    );
+    mStatusMessages->setTextShadow(true);
+    mStatusMessages->setTextColour(MyGUI::Colour::White);
+    mStatusMessages->setCaption("Here's some text, yay!");
 }
 
 Gui::~Gui()
 {
+    mGui->destroyWidget(mStatusMessages);
+    mStatusMessages = nullptr;
+
     mGui->shutdown();
     delete mGui;
     mGui = nullptr;
@@ -221,6 +231,13 @@ Gui::~Gui()
     mPlatform->shutdown();
     delete mPlatform;
     mPlatform = nullptr;
+}
+
+
+void Gui::updateStatus(const std::string& str)
+{
+    // NOTE: Avoid extra work (UTF-8 -> UTF-16/32 conversion) if the string is empty
+    mStatusMessages->setCaption(str.empty() ? MyGUI::UString() : MyGUI::UString(str));
 }
 
 

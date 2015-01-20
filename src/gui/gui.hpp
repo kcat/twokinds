@@ -1,6 +1,7 @@
 #ifndef GUI_GUI_HPP
 #define GUI_GUI_HPP
 
+#include <string>
 
 namespace Ogre
 {
@@ -12,6 +13,7 @@ namespace MyGUI
 {
     class OgrePlatform;
     class Gui;
+    class TextBox;
 }
 
 
@@ -22,9 +24,13 @@ class Gui {
     MyGUI::OgrePlatform *mPlatform;
     MyGUI::Gui *mGui;
 
+    MyGUI::TextBox *mStatusMessages;
+
 public:
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
+
+    void updateStatus(const std::string &str);
 
     void mouseMoved(int x, int y, int z);
     void mousePressed(int x, int y, int button);
