@@ -292,7 +292,7 @@ void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
     {
         if(!evt.repeat)
             mGui->injectKeyPress(evt.keysym.sym);
-        if(evt.keysym.sym == SDLK_RETURN)
+        if(evt.keysym.sym == SDLK_F1)
             mDisplayDebugStats = !mDisplayDebugStats;
     }
     else if(evt.state == SDL_RELEASED)
