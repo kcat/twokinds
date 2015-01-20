@@ -291,14 +291,11 @@ void Gui::mouseReleased(int x, int y, int button)
 }
 
 
-void Gui::injectKeyPress(SDL_Keycode code, const char *text)
+void Gui::injectKeyPress(SDL_Keycode code)
 {
-    std::vector<unsigned int> unicode = utf8ToUnicode(text);
     auto key = SDLtoMyGUIKeycode.find(code);
     if(key != SDLtoMyGUIKeycode.end())
-        MyGUI::InputManager::getInstance().injectKeyPress(
-            key->second, unicode.empty() ? 0 : unicode[0]
-        );
+        MyGUI::InputManager::getInstance().injectKeyPress(key->second, 0);
     else
         Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL keycode: "<<code;
 }
@@ -308,6 +305,14 @@ void Gui::injectKeyRelease(SDL_Keycode code)
     auto key = SDLtoMyGUIKeycode.find(code);
     if(key != SDLtoMyGUIKeycode.end())
         MyGUI::InputManager::getInstance().injectKeyRelease(key->second);
+}
+
+void Gui::injectTextInput(const char* text)
+{
+    auto &inputMgr = MyGUI::InputManager::getInstance();
+    std::vector<unsigned int> unicode = utf8ToUnicode(text);
+    for(auto character : unicode)
+        inputMgr.injectKeyPress(MyGUI::KeyCode::None, character);
 }
 
 

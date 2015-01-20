@@ -37,8 +37,9 @@ public:
     void mouseMoved(int x, int y, int z);
     void mousePressed(int x, int y, int button);
     void mouseReleased(int x, int y, int button);
-    void injectKeyPress(SDL_Keycode code, const char *text);
+    void injectKeyPress(SDL_Keycode code);
     void injectKeyRelease(SDL_Keycode code);
+    void injectTextInput(const char *text);
 };
 
 } // namespace TK
