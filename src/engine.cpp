@@ -533,7 +533,8 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     mCamera->setPosition(pos);
 
     std::stringstream status;
-    status << "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
+    status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
+    status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
     World::get().getStatus(status);
     mGui->updateStatus(status.str());
 
