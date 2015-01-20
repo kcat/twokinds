@@ -127,6 +127,8 @@ namespace Terrain
         void loadLayers(const std::vector<Ogre::PixelBox> &blendmaps, const std::vector<LayerInfo> &layerList);
         void unloadLayers();
 
+        void getInfo(std::map<size_t,size_t> &chunks, size_t &nodes) const;
+
     private:
         // Stored here for convenience in case we need layer list again
         MaterialGenerator* mMaterialGenerator;

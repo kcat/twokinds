@@ -177,6 +177,30 @@ namespace Terrain
         return mVisible;
     }
 
+    void DefaultWorld::getStatus(std::ostream &status) const
+    {
+        static std::map<size_t,size_t> chunks;
+
+        size_t nodes = 0;
+        chunks.clear();
+        mRootNode->getInfo(chunks, nodes);
+
+        size_t totalchunks = 0;
+        if(!chunks.empty())
+        {
+            status<< "LOD:Chunks";
+            for(const auto &chunklod : chunks)
+            {
+                status<< ", "<<chunklod.first<<":"<<chunklod.second;
+                totalchunks += chunklod.second;
+            }
+            status<<std::endl;
+        }
+        status<< "Total chunks: "<<totalchunks <<std::endl;
+        status<< "Loaded nodes: "<<nodes<<" ("<<mFreeNodes.size()<<" free)" <<std::endl;
+    }
+
+
     void DefaultWorld::freeNode(QuadTreeNode *node)
     {
         mFreeNodes.push_back(node);

@@ -230,6 +230,20 @@ QuadTreeNode::~QuadTreeNode()
 }
 
 
+void QuadTreeNode::getInfo(std::map<size_t,size_t> &chunks, size_t &nodes) const
+{
+    ++nodes;
+
+    if(mChunk)
+        chunks[mLodLevel] += 1;
+    if(hasChildren())
+    {
+        for(int i = 0;i < 4;++i)
+            mChildren[i]->getInfo(chunks, nodes);
+    }
+}
+
+
 void QuadTreeNode::createChild(ChildDirection id, int size, const Ogre::Vector2 &center)
 {
     mChildren[id] = mTerrain->createNode(id, size, center, this);

@@ -70,7 +70,9 @@ namespace Terrain
         float getMaxY() const { return mMaxY; }
 
         /// Wait until all background loading is complete.
-        void syncLoad();
+        virtual void syncLoad();
+
+        virtual void getStatus(std::ostream &status) const;
 
     private:
         // Called from a background worker thread

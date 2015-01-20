@@ -1,6 +1,8 @@
 #ifndef COMPONENTS_TERRAIN_WORLD_H
 #define COMPONENTS_TERRAIN_WORLD_H
 
+#include <iostream>
+
 #include <OgreVector3.h>
 
 #include "defs.hpp"
@@ -73,6 +75,8 @@ namespace Terrain
 
         /// Wait until all background loading is complete.
         virtual void syncLoad() {}
+
+        virtual void getStatus(std::ostream&) const { }
 
     protected:
         bool mShaders;

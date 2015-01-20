@@ -320,8 +320,9 @@ void World::update(const Ogre::Vector3 &cameraPos)
 }
 
 
-void World::getStatus(std::stringstream &status) const
+void World::getStatus(std::ostream &status) const
 {
+    mTerrain->getStatus(status);
 }
 
 

@@ -211,12 +211,11 @@ Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
 
     MyGUI::PointerManager::getInstance().setVisible(false);
     mStatusMessages = mGui->createWidgetReal<MyGUI::TextBox>("TextBox",
-        MyGUI::FloatCoord(0.f, 0.f, 1.f, 0.25f), MyGUI::Align::Default,
+        MyGUI::FloatCoord(0.f, 0.f, 1.f, .25f), MyGUI::Align::Default,
         "Overlapped"
     );
     mStatusMessages->setTextShadow(true);
     mStatusMessages->setTextColour(MyGUI::Colour::White);
-    mStatusMessages->setCaption("Here's some text, yay!");
 }
 
 Gui::~Gui()
