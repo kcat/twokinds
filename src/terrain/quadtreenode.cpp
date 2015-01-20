@@ -342,14 +342,14 @@ void QuadTreeNode::buildQuadTree(const Ogre::Vector3 &cameraPos)
 {
     if(mWorldBounds.isNull())
         initAabb();
-    float dist = mWorldBounds.distance(cameraPos);
 
     // Simple LOD selection
     /// \todo use error metrics?
     size_t wantedLod = 0;
     float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
 
-    if(dist > cellWorldSize*1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
+    float dist = mWorldBounds.distance(cameraPos) - cellWorldSize*0.25f;
+    if(dist > cellWorldSize)
         wantedLod = Log2(dist/cellWorldSize)+1;
 
     bool isLeaf = mSize <= 1 || (mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod);
@@ -430,8 +430,6 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
     if (mBounds.isNull())
         return true;
 
-    float dist = mWorldBounds.distance(cameraPos);
-
     // Make sure our scene node is attached
     if (!mSceneNode->isInSceneGraph())
     {
@@ -443,7 +441,8 @@ bool QuadTreeNode::update(const Ogre::Vector3 &cameraPos)
     size_t wantedLod = 0;
     float cellWorldSize = mTerrain->getStorage()->getCellWorldSize();
 
-    if(dist > cellWorldSize*1.42) // < sqrt2 so the 3x3 grid around player is always highest lod
+    float dist = mWorldBounds.distance(cameraPos) - cellWorldSize*0.25f;
+    if(dist > cellWorldSize)
         wantedLod = Log2(dist/cellWorldSize)+1;
 
     bool wantToDisplay = mSize <= mTerrain->getMaxBatchSize() && mLodLevel <= wantedLod;
