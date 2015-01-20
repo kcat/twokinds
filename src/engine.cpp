@@ -115,6 +115,7 @@ Engine::Engine(void)
   , mCamera(nullptr)
   , mViewport(nullptr)
   , mGui(nullptr)
+  , mDisplayDebugStats(false)
 {
 }
 
@@ -291,6 +292,8 @@ void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
     {
         if(!evt.repeat)
             mGui->injectKeyPress(evt.keysym.scancode, "");
+        if(evt.keysym.scancode == SDL_SCANCODE_RETURN)
+            mDisplayDebugStats = !mDisplayDebugStats;
     }
     else if(evt.state == SDL_RELEASED)
         mGui->injectKeyRelease(evt.keysym.scancode);
@@ -532,11 +535,16 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
     mCamera->setPosition(pos);
 
-    std::stringstream status;
-    status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
-    status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
-    World::get().getStatus(status);
-    mGui->updateStatus(status.str());
+    if(!mDisplayDebugStats)
+        mGui->updateStatus(std::string());
+    else
+    {
+        std::stringstream status;
+        status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
+        status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
+        World::get().getStatus(status);
+        mGui->updateStatus(status.str());
+    }
 
     return true;
 }

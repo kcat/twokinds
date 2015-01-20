@@ -216,6 +216,7 @@ Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
     );
     mStatusMessages->setTextShadow(true);
     mStatusMessages->setTextColour(MyGUI::Colour::White);
+    mStatusMessages->setVisible(false);
 }
 
 Gui::~Gui()
@@ -233,10 +234,15 @@ Gui::~Gui()
 }
 
 
-void Gui::updateStatus(const std::string& str)
+void Gui::updateStatus(const std::string &str)
 {
-    // NOTE: Avoid extra work (UTF-8 -> UTF-16/32 conversion) if the string is empty
-    mStatusMessages->setCaption(str.empty() ? MyGUI::UString() : MyGUI::UString(str));
+    if(str.empty())
+        mStatusMessages->setVisible(false);
+    else
+    {
+        mStatusMessages->setCaption(MyGUI::UString(str));
+        mStatusMessages->setVisible(true);
+    }
 }
 
 

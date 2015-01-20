@@ -39,6 +39,8 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 
     Gui *mGui;
 
+    bool mDisplayDebugStats;
+
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
