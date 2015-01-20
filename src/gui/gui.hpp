@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <SDL_scancode.h>
+#include <SDL_keycode.h>
 
 namespace Ogre
 {
@@ -37,8 +37,8 @@ public:
     void mouseMoved(int x, int y, int z);
     void mousePressed(int x, int y, int button);
     void mouseReleased(int x, int y, int button);
-    void injectKeyPress(SDL_Scancode code, const char *text);
-    void injectKeyRelease(SDL_Scancode code);
+    void injectKeyPress(SDL_Keycode code, const char *text);
+    void injectKeyRelease(SDL_Keycode code);
 };
 
 } // namespace TK

@@ -291,17 +291,17 @@ void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
     if(evt.state == SDL_PRESSED)
     {
         if(!evt.repeat)
-            mGui->injectKeyPress(evt.keysym.scancode, "");
-        if(evt.keysym.scancode == SDL_SCANCODE_RETURN)
+            mGui->injectKeyPress(evt.keysym.sym, "");
+        if(evt.keysym.scancode == SDLK_RETURN)
             mDisplayDebugStats = !mDisplayDebugStats;
     }
     else if(evt.state == SDL_RELEASED)
-        mGui->injectKeyRelease(evt.keysym.scancode);
+        mGui->injectKeyRelease(evt.keysym.sym);
 }
 
 void Engine::handleTextInputEvent(const SDL_TextInputEvent &evt)
 {
-    mGui->injectKeyPress(SDL_SCANCODE_UNKNOWN, evt.text);
+    mGui->injectKeyPress(SDLK_UNKNOWN, evt.text);
 }
 
 bool Engine::pumpEvents()
