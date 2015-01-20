@@ -9,7 +9,7 @@
 
 namespace
 {
-    const std::map<int,MyGUI::KeyCode> SDLScancode2MyGUIKeycode{
+    const std::map<SDL_Scancode,MyGUI::KeyCode> SDLScancode2MyGUIKeycode{
         {SDL_SCANCODE_UNKNOWN, MyGUI::KeyCode::None},
 
         {SDL_SCANCODE_A, MyGUI::KeyCode::A},
@@ -291,21 +291,21 @@ void Gui::mouseReleased(int x, int y, int button)
 }
 
 
-void Gui::injectKeyPress(int scancode, const char *text)
+void Gui::injectKeyPress(SDL_Scancode code, const char *text)
 {
     std::vector<unsigned int> unicode = utf8ToUnicode(text);
-    auto key = SDLScancode2MyGUIKeycode.find(scancode);
+    auto key = SDLScancode2MyGUIKeycode.find(code);
     if(key != SDLScancode2MyGUIKeycode.end())
         MyGUI::InputManager::getInstance().injectKeyPress(
             key->second, unicode.empty() ? 0 : unicode[0]
         );
     else
-        Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL scancode: "<<scancode;
+        Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL scancode: "<<code;
 }
 
-void Gui::injectKeyRelease(int scancode)
+void Gui::injectKeyRelease(SDL_Scancode code)
 {
-    auto key = SDLScancode2MyGUIKeycode.find(scancode);
+    auto key = SDLScancode2MyGUIKeycode.find(code);
     if(key != SDLScancode2MyGUIKeycode.end())
         MyGUI::InputManager::getInstance().injectKeyRelease(key->second);
 }

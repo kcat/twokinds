@@ -301,7 +301,7 @@ void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
 
 void Engine::handleTextInputEvent(const SDL_TextInputEvent &evt)
 {
-    mGui->injectKeyPress(0, evt.text);
+    mGui->injectKeyPress(SDL_SCANCODE_UNKNOWN, evt.text);
 }
 
 bool Engine::pumpEvents()

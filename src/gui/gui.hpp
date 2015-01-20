@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include <SDL_scancode.h>
+
 namespace Ogre
 {
     class RenderWindow;
@@ -35,8 +37,8 @@ public:
     void mouseMoved(int x, int y, int z);
     void mousePressed(int x, int y, int button);
     void mouseReleased(int x, int y, int button);
-    void injectKeyPress(int scancode, const char *text);
-    void injectKeyRelease(int scancode);
+    void injectKeyPress(SDL_Scancode code, const char *text);
+    void injectKeyRelease(SDL_Scancode code);
 };
 
 } // namespace TK
