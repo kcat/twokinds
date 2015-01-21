@@ -29,6 +29,9 @@ class Gui;
 
 class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 {
+    typedef void (Engine::*CmdFuncT)(const std::string&);
+    typedef std::map<std::string,CmdFuncT> CommandFuncMap;
+
     SDL_Window *mSDLWindow;
 
     Ogre::Root *mRoot;
@@ -41,6 +44,8 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
 
     bool mDisplayDebugStats;
 
+    const CommandFuncMap mCommandFuncs;
+
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
@@ -50,6 +55,8 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     void handleTextInputEvent(const SDL_TextInputEvent &evt);
     bool pumpEvents();
 
+    void quitCmd(const std::string &value);
+    void toggleDebugDisplayCmd(const std::string &value);
     void internalCommand(const std::string &key, const std::string &value);
 
     virtual bool frameStarted(const Ogre::FrameEvent &evt);

@@ -117,6 +117,10 @@ Engine::Engine(void)
   , mViewport(nullptr)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
+  , mCommandFuncs{
+      { "qqq", &Engine::quitCmd },
+      { "tdd", &Engine::toggleDebugDisplayCmd }
+    }
 {
 }
 
@@ -346,14 +350,24 @@ bool Engine::pumpEvents()
 }
 
 
+void Engine::quitCmd(const std::string&)
+{
+    SDL_Event evt{};
+    evt.quit.type = SDL_QUIT;
+    SDL_PushEvent(&evt);
+}
+
+void Engine::toggleDebugDisplayCmd(const std::string&)
+{
+    mDisplayDebugStats = !mDisplayDebugStats;
+}
+
 void Engine::internalCommand(const std::string &key, const std::string &value)
 {
-    if(key == "qqq")
-    {
-        SDL_Event evt{};
-        evt.quit.type = SDL_QUIT;
-        SDL_PushEvent(&evt);
-    }
+    auto cmd = mCommandFuncs.find(key);
+    if(cmd != mCommandFuncs.end())
+        return (this->*cmd->second)(value);
+    throw std::runtime_error("Unexpected engine command: "+key);
 }
 
 
@@ -485,7 +499,8 @@ bool Engine::go(void)
 
     // Setup GUI subsystem
     mGui = new Gui(mWindow, mSceneMgr);
-    mGui->addConsoleCallback("qqq", makeDelegate(this, &Engine::internalCommand));
+    for(const auto &cmd : mCommandFuncs)
+        mGui->addConsoleCallback(cmd.first.c_str(), makeDelegate(this, &Engine::internalCommand));
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
