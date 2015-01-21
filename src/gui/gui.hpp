@@ -35,6 +35,10 @@ class Gui {
 
     Console *mConsole;
 
+    int mMouseX;
+    int mMouseY;
+    int mMouseZ;
+
 public:
     enum Mode {
         Mode_Game,
@@ -50,7 +54,8 @@ public:
 
     void updateStatus(const std::string &str);
 
-    void mouseMoved(int x, int y, int z);
+    void mouseMoved(int x, int y);
+    void mouseWheel(int z); /* Value is relative */
     void mousePressed(int x, int y, int button);
     void mouseReleased(int x, int y, int button);
     void injectKeyPress(SDL_Keycode code);

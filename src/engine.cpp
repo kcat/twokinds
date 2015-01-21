@@ -267,7 +267,7 @@ void Engine::handleWindowEvent(const SDL_WindowEvent &evt)
 
 void Engine::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
 {
-    mGui->mouseMoved(evt.x, evt.y, 0);
+    mGui->mouseMoved(evt.x, evt.y);
 
     if(mGui->getMode() == Gui::Mode_Game)
     {
@@ -284,6 +284,11 @@ void Engine::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
             mCamera->setOrientation(mat3);
         }
     }
+}
+
+void Engine::handleMouseWheelEvent(const SDL_MouseWheelEvent &evt)
+{
+    mGui->mouseWheel(evt.y);
 }
 
 void Engine::handleMouseButtonEvent(const SDL_MouseButtonEvent &evt)
@@ -327,6 +332,9 @@ bool Engine::pumpEvents()
 
         case SDL_MOUSEMOTION:
             handleMouseMotionEvent(evt.motion);
+            break;
+        case SDL_MOUSEWHEEL:
+            handleMouseWheelEvent(evt.wheel);
             break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
