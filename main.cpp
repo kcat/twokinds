@@ -34,11 +34,10 @@ static void DoErrorMessage(const char *msg, const char *title)
         cmd<< " -center '"<<msg<<"'";
     }
 
-    int err = system(cmd.str().c_str());
-    if(WIFEXITED(err) == 0 || WEXITSTATUS(err) != 0)
-        std::cerr<< "*** "<<title<<" ***" <<std::endl
-                 << msg <<std::endl
-                 << "***" <<std::endl;
+    std::cerr<< "*** "<<title<<" ***" <<std::endl
+             << msg <<std::endl
+             << "***" <<std::endl;
+    (void)system(cmd.str().c_str());
 #endif
 }
 
