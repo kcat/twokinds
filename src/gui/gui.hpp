@@ -22,15 +22,27 @@ namespace MyGUI
 namespace TK
 {
 
+
+class Console;
+
 class Gui {
     MyGUI::OgrePlatform *mPlatform;
     MyGUI::Gui *mGui;
 
     MyGUI::TextBox *mStatusMessages;
 
+    Console *mConsole;
+
 public:
+    enum Mode {
+        Mode_Game,
+        Mode_Console
+    };
+
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
+
+    Mode getMode() const;
 
     void updateStatus(const std::string &str);
 

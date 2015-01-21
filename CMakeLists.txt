@@ -106,6 +106,7 @@ set(HDRS src/archives/physfs.hpp
          src/terrain/world.hpp
          src/terrain.hpp
          src/engine.hpp
+         src/delegates.hpp
 )
 
 set(SRCS src/archives/physfs.cpp

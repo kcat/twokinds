@@ -264,17 +264,20 @@ void Engine::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
 {
     mGui->mouseMoved(evt.x, evt.y, 0);
 
-    /* HACK: mouse moves the camera around */
-    if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
+    if(mGui->getMode() == Gui::Mode_Game)
     {
-        static float x=0.0f, y=0.0f;
-        /* Rotation (x motion rotates around y, y motion rotates around x) */
-        x += evt.yrel * 0.1f;
-        y += evt.xrel * 0.1f;
+        /* HACK: mouse moves the camera around */
+        if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
+        {
+            static float x=0.0f, y=0.0f;
+            /* Rotation (x motion rotates around y, y motion rotates around x) */
+            x += evt.yrel * 0.1f;
+            y += evt.xrel * 0.1f;
 
-        Ogre::Matrix3 mat3;
-        mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-        mCamera->setOrientation(mat3);
+            Ogre::Matrix3 mat3;
+            mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+            mCamera->setOrientation(mat3);
+        }
     }
 }
 
@@ -515,25 +518,28 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
         return false;
 
     float frametime = std::min<Ogre::Real>(1.0f/20.0f, evt.timeSinceLastFrame);
-    Ogre::Vector3 movedir(0.0f);
-    Ogre::Real speed = 60.0f * frametime;
-    if(keystate[SDL_SCANCODE_LSHIFT])
-        speed *= 2.0f;
+    if(mGui->getMode() == Gui::Mode_Game)
+    {
+        Ogre::Vector3 movedir(0.0f);
+        Ogre::Real speed = 60.0f * frametime;
+        if(keystate[SDL_SCANCODE_LSHIFT])
+            speed *= 2.0f;
 
-    if(keystate[SDL_SCANCODE_W])
-        movedir.z += -1.0f;
-    if(keystate[SDL_SCANCODE_A])
-        movedir.x += -1.0f;
-    if(keystate[SDL_SCANCODE_S])
-        movedir.z += +1.0f;
-    if(keystate[SDL_SCANCODE_D])
-        movedir.x += +1.0f;
+        if(keystate[SDL_SCANCODE_W])
+            movedir.z += -1.0f;
+        if(keystate[SDL_SCANCODE_A])
+            movedir.x += -1.0f;
+        if(keystate[SDL_SCANCODE_S])
+            movedir.z += +1.0f;
+        if(keystate[SDL_SCANCODE_D])
+            movedir.x += +1.0f;
 
-    Ogre::Vector3 pos = mCamera->getPosition();
-    Ogre::Quaternion ori = mCamera->getOrientation();
-    pos += (ori*movedir)*speed;
-    pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
-    mCamera->setPosition(pos);
+        Ogre::Vector3 pos = mCamera->getPosition();
+        Ogre::Quaternion ori = mCamera->getOrientation();
+        pos += (ori*movedir)*speed;
+        pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
+        mCamera->setPosition(pos);
+    }
 
     if(!mDisplayDebugStats)
         mGui->updateStatus(std::string());
@@ -541,7 +547,7 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     {
         std::stringstream status;
         status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
-        status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<pos <<std::endl;
+        status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<mCamera->getPosition() <<std::endl;
         World::get().getStatus(status);
         mGui->updateStatus(status.str());
     }

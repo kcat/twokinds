@@ -7,6 +7,9 @@
 #include <SDL_scancode.h>
 #include <SDL_mouse.h>
 
+#include "delegates.hpp"
+
+
 namespace
 {
     const std::map<SDL_Keycode,MyGUI::KeyCode> SDLtoMyGUIKeycode{
@@ -187,6 +190,208 @@ namespace
 namespace TK
 {
 
+typedef CDelegate<const MyGUI::UString&, const MyGUI::UString&> CommandDelegate;
+typedef std::map<MyGUI::UString, CommandDelegate> MapDelegate;
+
+class Console {
+    MyGUI::VectorWidgetPtr mWidgets;
+    MyGUI::Widget *mMainWidget;
+
+    MyGUI::EditBox *mListHistory;
+    MyGUI::ComboBox *mComboCommand;
+    MyGUI::Button *mButtonSubmit;
+
+    MapDelegate mDelegates;
+
+    MyGUI::UString mStringCurrent;
+    MyGUI::UString mStringError;
+    MyGUI::UString mStringSuccess;
+    MyGUI::UString mStringUnknown;
+    MyGUI::UString mStringFormat;
+
+    bool mAutoCompleted;
+
+    template<typename T=MyGUI::Widget>
+    T *getWidget(const char *name)
+    {
+        for(MyGUI::Widget *widget : mWidgets)
+        {
+            MyGUI::Widget *w = widget->findWidget(name);
+            if(w) return w->castType<T>();
+        }
+        throw std::runtime_error(std::string("Failed to find widget ")+name);
+    }
+
+    void notifyWindowButtonPressed(MyGUI::Window *_sender, const std::string &_button)
+    {
+        if (_button == "close")
+            mMainWidget->setVisible(false);
+    }
+
+    void notifyMouseButtonClick(MyGUI::Widget *_sender)
+    {
+        notifyComboAccept(mComboCommand, MyGUI::ITEM_NONE);
+    }
+
+    void notifyComboAccept(MyGUI::ComboBox *_sender, size_t _index)
+    {
+        const MyGUI::UString& command = _sender->getOnlyText();
+        if(command.empty()) return;
+
+        MyGUI::UString key = command;
+        MyGUI::UString value;
+
+        size_t pos = command.find(' ');
+        if(pos != MyGUI::UString::npos)
+        {
+            key = command.substr(0, pos);
+            value = command.substr(pos + 1);
+        }
+
+        MapDelegate::iterator iter = mDelegates.find(key);
+        if(iter != mDelegates.end())
+            iter->second(key, value);
+        else
+            addToConsole(mStringUnknown + "'" + key + "'");
+
+        _sender->setCaption("");
+    }
+
+    void notifyButtonPressed(MyGUI::Widget *_sender, MyGUI::KeyCode _key, MyGUI::Char _char)
+    {
+        MyGUI::EditBox* edit = _sender->castType<MyGUI::EditBox>();
+        size_t len = edit->getCaption().length();
+        if(_key == MyGUI::KeyCode::Backspace && len > 0 && mAutoCompleted)
+        {
+            edit->deleteTextSelection();
+            len = edit->getCaption().length();
+            edit->eraseText(len - 1);
+        }
+
+        MyGUI::UString command = edit->getCaption();
+        if(command.empty()) return;
+
+        for(MapDelegate::iterator iter = mDelegates.begin(); iter != mDelegates.end(); ++iter)
+        {
+            if(iter->first.find(command) == 0)
+            {
+                if(command == iter->first)
+                    break;
+                edit->setCaption(iter->first);
+                edit->setTextSelection(command.length(), iter->first.length());
+                mAutoCompleted = true;
+                return;
+            }
+        }
+        mAutoCompleted = false;
+    }
+
+    void addToConsole(const MyGUI::UString &_line)
+    {
+        if(mListHistory->getCaption().empty())
+            mListHistory->addText(_line);
+        else
+            mListHistory->addText("\n" + _line);
+        mListHistory->setTextSelection(mListHistory->getTextLength(), mListHistory->getTextLength());
+    }
+
+    void clearConsole()
+    {
+        mListHistory->setCaption("");
+    }
+
+    void registerConsoleDelegate(const MyGUI::UString &_command, CommandDelegate::DelegateT *_delegate)
+    {
+        mComboCommand->addItem(_command);
+        MapDelegate::iterator iter = mDelegates.find(_command);
+        if (iter == mDelegates.end())
+            mDelegates[_command] = _delegate;
+    }
+
+    void unregisterConsoleDelegate(const MyGUI::UString &_command)
+    {
+        MapDelegate::iterator iter = mDelegates.find(_command);
+        if(iter != mDelegates.end())
+        {
+            mDelegates.erase(iter);
+            for(size_t i = 0; i < mComboCommand->getItemCount(); ++i)
+            {
+                if(mComboCommand->getItemNameAt(i) == _command)
+                {
+                    mComboCommand->removeItemAt(i);
+                    break;
+                }
+            }
+        }
+    }
+
+    void internalCommand(MyGUI::Widget *_sender, const MyGUI::UString &_key, const MyGUI::UString &_value)
+    {
+        if(_key == "clear")
+            clearConsole();
+    }
+
+    void addToConsole(const MyGUI::UString &_reason, const MyGUI::UString &_key, const MyGUI::UString &_value)
+    {
+        addToConsole(MyGUI::utility::toString(_reason, "'", _key, " ", _value, "'"));
+    }
+
+    CommandDelegate eventConsoleUnknownCommand;
+
+    const MyGUI::UString& getConsoleStringCurrent() const { return mStringCurrent; }
+    const MyGUI::UString& getConsoleStringError() const { return mStringError; }
+    const MyGUI::UString& getConsoleStringSuccess() const { return mStringSuccess; }
+    const MyGUI::UString& getConsoleStringUnknown() const { return mStringUnknown; }
+    const MyGUI::UString& getConsoleStringFormat() const { return mStringFormat; }
+
+public:
+    Console(const std::string &layout_name)
+      : mWidgets(MyGUI::LayoutManager::getInstance().loadLayout(layout_name))
+      , mMainWidget(nullptr)
+      , mListHistory(nullptr)
+      , mComboCommand(nullptr)
+      , mButtonSubmit(nullptr)
+      , mAutoCompleted(false)
+    {
+        mMainWidget = getWidget("_Main");
+        mListHistory = getWidget<MyGUI::EditBox>("list_History");
+        mComboCommand = getWidget<MyGUI::ComboBox>("combo_Command");
+        mButtonSubmit = getWidget<MyGUI::Button>("button_Submit");
+
+        mMainWidget->setVisible(false);
+        mMainWidget->setEnabled(false);
+
+        MyGUI::Window *window = mMainWidget->castType<MyGUI::Window>(false);
+        if(window != nullptr)
+            window->eventWindowButtonPressed += newDelegate(this, &Console::notifyWindowButtonPressed);
+
+        mStringCurrent = mMainWidget->getUserString("Current");
+        mStringError = mMainWidget->getUserString("Error");
+        mStringSuccess = mMainWidget->getUserString("Success");
+        mStringUnknown = mMainWidget->getUserString("Unknown");
+        mStringFormat = mMainWidget->getUserString("Format");
+
+        mComboCommand->eventComboAccept += newDelegate(this, &Console::notifyComboAccept);
+        mComboCommand->eventKeyButtonPressed += newDelegate(this, &Console::notifyButtonPressed);
+        mButtonSubmit->eventMouseButtonClick += newDelegate(this, &Console::notifyMouseButtonClick);
+        mListHistory->setOverflowToTheLeft(true);
+    }
+
+    bool getActive() const { return mMainWidget->getVisible(); }
+    void setActive(bool active)
+    {
+        mMainWidget->setVisible(active);
+        mMainWidget->setEnabled(active);
+    }
+
+    template<typename T, typename FUNCT>
+    void addCommandCallback(const MyGUI::UString &command, T *obj, FUNCT *func)
+    {
+        registerConsoleDelegate(command, makeDelegate(obj, func));
+    }
+};
+
+
 Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
 {
     try {
@@ -217,10 +422,15 @@ Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
     mStatusMessages->setTextShadow(true);
     mStatusMessages->setTextColour(MyGUI::Colour::White);
     mStatusMessages->setVisible(false);
+
+    mConsole = new Console("Console.layout");
 }
 
 Gui::~Gui()
 {
+    delete mConsole;
+    mConsole = nullptr;
+
     mGui->destroyWidget(mStatusMessages);
     mStatusMessages = nullptr;
 
@@ -231,6 +441,14 @@ Gui::~Gui()
     mPlatform->shutdown();
     delete mPlatform;
     mPlatform = nullptr;
+}
+
+
+Gui::Mode Gui::getMode() const
+{
+    if(mConsole->getActive())
+        return Mode_Console;
+    return Mode_Game;
 }
 
 
@@ -295,7 +513,11 @@ void Gui::injectKeyPress(SDL_Keycode code)
 {
     auto key = SDLtoMyGUIKeycode.find(code);
     if(key != SDLtoMyGUIKeycode.end())
+    {
+        if(code == SDLK_BACKQUOTE)
+            mConsole->setActive(!mConsole->getActive());
         MyGUI::InputManager::getInstance().injectKeyPress(key->second, 0);
+    }
     else
         Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL keycode: "<<code;
 }
