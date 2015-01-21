@@ -22,6 +22,8 @@ namespace MyGUI
 namespace TK
 {
 
+template<typename ...Args> class IDelegate;
+typedef IDelegate<const std::string&,const std::string&> CommandDelegateT;
 
 class Console;
 
@@ -43,6 +45,8 @@ public:
     virtual ~Gui();
 
     Mode getMode() const;
+
+    void addConsoleCallback(const char *command, CommandDelegateT *delegate);
 
     void updateStatus(const std::string &str);
 

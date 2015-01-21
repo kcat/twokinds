@@ -31,6 +31,7 @@
 #include "archives/physfs.hpp"
 #include "gui/gui.hpp"
 #include "terrain.hpp"
+#include "delegates.hpp"
 
 
 namespace
@@ -345,6 +346,17 @@ bool Engine::pumpEvents()
 }
 
 
+void Engine::internalCommand(const std::string &key, const std::string &value)
+{
+    if(key == "qqq")
+    {
+        SDL_Event evt{};
+        evt.quit.type = SDL_QUIT;
+        SDL_PushEvent(&evt);
+    }
+}
+
+
 bool Engine::go(void)
 {
     // Kindly ask SDL not to trash our OGL context
@@ -473,6 +485,7 @@ bool Engine::go(void)
 
     // Setup GUI subsystem
     mGui = new Gui(mWindow, mSceneMgr);
+    mGui->addConsoleCallback("qqq", makeDelegate(this, &Engine::internalCommand));
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));

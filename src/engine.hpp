@@ -50,6 +50,8 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     void handleTextInputEvent(const SDL_TextInputEvent &evt);
     bool pumpEvents();
 
+    void internalCommand(const std::string &key, const std::string &value);
+
     virtual bool frameStarted(const Ogre::FrameEvent &evt);
     virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);
 

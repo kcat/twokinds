@@ -190,10 +190,10 @@ namespace
 namespace TK
 {
 
-typedef CDelegate<const MyGUI::UString&, const MyGUI::UString&> CommandDelegate;
-typedef std::map<MyGUI::UString, CommandDelegate> MapDelegate;
-
 class Console {
+    typedef CDelegate<const std::string&,const std::string&> CommandDelegate;
+    typedef std::map<MyGUI::UString, CommandDelegate> MapDelegate;
+
     MyGUI::VectorWidgetPtr mWidgets;
     MyGUI::Widget *mMainWidget;
 
@@ -222,9 +222,9 @@ class Console {
         throw std::runtime_error(std::string("Failed to find widget ")+name);
     }
 
-    void notifyWindowButtonPressed(MyGUI::Window *_sender, const std::string &_button)
+    void notifyWindowButtonPressed(MyGUI::Window *_sender, const std::string &button)
     {
-        if (_button == "close")
+        if(button == "close")
             mMainWidget->setVisible(false);
     }
 
@@ -298,6 +298,7 @@ class Console {
     void clearConsole()
     {
         mListHistory->setCaption("");
+        mAutoCompleted = false;
     }
 
     void registerConsoleDelegate(const MyGUI::UString &_command, CommandDelegate::DelegateT *_delegate)
@@ -325,9 +326,9 @@ class Console {
         }
     }
 
-    void internalCommand(MyGUI::Widget *_sender, const MyGUI::UString &_key, const MyGUI::UString &_value)
+    void internalCommand(const std::string &key, const std::string &value)
     {
-        if(_key == "clear")
+        if(key == "clear")
             clearConsole();
     }
 
@@ -335,8 +336,6 @@ class Console {
     {
         addToConsole(MyGUI::utility::toString(_reason, "'", _key, " ", _value, "'"));
     }
-
-    CommandDelegate eventConsoleUnknownCommand;
 
     const MyGUI::UString& getConsoleStringCurrent() const { return mStringCurrent; }
     const MyGUI::UString& getConsoleStringError() const { return mStringError; }
@@ -375,6 +374,8 @@ public:
         mComboCommand->eventKeyButtonPressed += newDelegate(this, &Console::notifyButtonPressed);
         mButtonSubmit->eventMouseButtonClick += newDelegate(this, &Console::notifyMouseButtonClick);
         mListHistory->setOverflowToTheLeft(true);
+
+        registerConsoleDelegate("clear", makeDelegate(this, &Console::internalCommand));
     }
 
     bool getActive() const { return mMainWidget->getVisible(); }
@@ -384,10 +385,9 @@ public:
         mMainWidget->setEnabled(active);
     }
 
-    template<typename T, typename FUNCT>
-    void addCommandCallback(const MyGUI::UString &command, T *obj, FUNCT *func)
+    void addCommandCallback(const MyGUI::UString &command, CommandDelegate::DelegateT *delegate)
     {
-        registerConsoleDelegate(command, makeDelegate(obj, func));
+        registerConsoleDelegate(command, delegate);
     }
 };
 
@@ -449,6 +449,12 @@ Gui::Mode Gui::getMode() const
     if(mConsole->getActive())
         return Mode_Console;
     return Mode_Game;
+}
+
+
+void Gui::addConsoleCallback(const char *command, CommandDelegateT *delegate)
+{
+    mConsole->addCommandCallback(command, delegate);
 }
 
 
