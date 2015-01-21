@@ -57,7 +57,7 @@ private:
 };
 
 template<typename T, typename ...Args>
-class CMethodDelegate : public IDelegate<T,Args...>
+class CMethodDelegate : public IDelegate<Args...>
 {
 public:
     typedef void (T::*Method)(Args...);
@@ -76,7 +76,7 @@ public:
         (mObject->*mMethod)(args...);
     }
 
-    virtual bool compare(IDelegate<T,Args...> *_delegate) const
+    virtual bool compare(IDelegate<Args...> *_delegate) const
     {
         if (nullptr == _delegate || !_delegate->isType(typeid(CMethodDelegate<T,Args...>)))
             return false;
@@ -315,7 +315,7 @@ inline IDelegate<Args...>* makeDelegate(void (*func)(Args...))
 }
 
 template<typename T, typename ...Args>
-inline IDelegate<T,Args...>* makeDelegate(T *obj, void (T::*Func)(Args...))
+inline IDelegate<Args...>* makeDelegate(T *obj, void (T::*Func)(Args...))
 {
     return new CMethodDelegate<T,Args...>(MyGUI::delegates::GetDelegateUnlink(obj), obj, Func);
 }
