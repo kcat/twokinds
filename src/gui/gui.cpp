@@ -298,7 +298,6 @@ class Console {
     void clearConsole()
     {
         mListHistory->setCaption("");
-        mAutoCompleted = false;
     }
 
     void registerConsoleDelegate(const MyGUI::UString &_command, CommandDelegate::DelegateT *_delegate)
