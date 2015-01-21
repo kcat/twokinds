@@ -225,7 +225,7 @@ class Console {
     void notifyWindowButtonPressed(MyGUI::Window *_sender, const std::string &button)
     {
         if(button == "close")
-            mMainWidget->setVisible(false);
+            setActive(false);
     }
 
     void notifyMouseButtonClick(MyGUI::Widget *_sender)
@@ -383,6 +383,7 @@ public:
     {
         mMainWidget->setVisible(active);
         mMainWidget->setEnabled(active);
+        MyGUI::PointerManager::getInstance().setVisible(active);
     }
 
     void addCommandCallback(const MyGUI::UString &command, CommandDelegate::DelegateT *delegate)

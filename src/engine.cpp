@@ -419,6 +419,7 @@ bool Engine::go(void)
         mRoot->initialise(false);
         mWindow = createRenderWindow(mSDLWindow);
     }
+    SDL_ShowCursor(0);
 
     // Setup resources
     {
