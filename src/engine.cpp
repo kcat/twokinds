@@ -119,8 +119,9 @@ Engine::Engine(void)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
+      { "savecfg", &Engine::saveCfgCmd },
+      { "tdd", &Engine::toggleDebugDisplayCmd },
       { "qqq", &Engine::quitCmd },
-      { "tdd", &Engine::toggleDebugDisplayCmd }
     }
 {
 }
@@ -371,6 +372,21 @@ void Engine::toggleDebugDisplayCmd(const std::string&)
     mDisplayDebugStats = !mDisplayDebugStats;
 }
 
+void Engine::saveCfgCmd(const std::string &value)
+{
+    static const std::string default_cfg("twokinds.cfg");
+    const std::string &cfg_name = (value.empty() ? default_cfg : value);
+    std::map<std::string,std::string> cvars = CVar::getAll();
+
+    mGui->printToConsole("Saving config "+cfg_name+"...");
+    std::ofstream ocfg(cfg_name, std::ios::binary);
+    if(!ocfg.is_open())
+        throw std::runtime_error("Failed to open "+cfg_name+" for writing");
+    ocfg<< "[CVars]" <<std::endl;
+    for(const auto &cvar : cvars)
+        ocfg<< cvar.first<<" = "<<cvar.second <<std::endl;
+}
+
 void Engine::internalCommand(const std::string &key, const std::string &value)
 {
     auto cmd = mCommandFuncs.find(key);
@@ -400,6 +416,26 @@ bool Engine::go(void)
 
     // Configure
     {
+        try {
+            Ogre::ConfigFile cf;
+            cf.load("twokinds.cfg");
+
+            Ogre::ConfigFile::SectionIterator seci = cf.getSectionIterator();
+            while(seci.hasMoreElements())
+            {
+                Ogre::String secName = seci.peekNextKey();
+                Ogre::ConfigFile::SettingsMultiMap *settings = seci.getNext();
+                if(secName == "CVars")
+                {
+                    for(const auto &i : *settings)
+                        CVar::setByName(i.first, i.second);
+                }
+            }
+        }
+        catch(Ogre::FileNotFoundException&) {
+            // Ignore if config file not found
+        }
+
         // Show the configuration dialog and initialise the system
         if(!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
             return false;

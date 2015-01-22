@@ -35,6 +35,11 @@ public:
         mCVarRegistry.insert(std::make_pair(std::move(name), cvar));
     }
 
+    const std::map<std::string,TK::CVar*>& getAll() const
+    {
+        return mCVarRegistry;
+    }
+
     void setCVarValue(const std::string &name, const std::string &value)
     {
         auto cvar = mCVarRegistry.find(name);
@@ -55,6 +60,13 @@ public:
             sstr<< name<<" = "<<cvar->second->get();
             TK::GuiIface::get().printToConsole(sstr.str());
         }
+    }
+
+    void loadCVarValue(const std::string &name, const std::string &value)
+    {
+        auto cvar = mCVarRegistry.find(name);
+        if(cvar != mCVarRegistry.end())
+            cvar->second->set(value);
     }
 
     void initialize()
@@ -81,6 +93,20 @@ namespace TK
 CVar::CVar(std::string&& name)
 {
     CVarRegistry::getSingleton().add(std::move(name), this);
+}
+
+void CVar::setByName(const std::string &name, const std::string &value)
+{
+    CVarRegistry::getSingleton().loadCVarValue(name, value);
+}
+
+std::map<std::string,std::string> CVar::getAll()
+{
+    std::map<std::string,std::string> ret;
+    const auto &cvars = CVarRegistry::getSingleton().getAll();
+    for(const auto &cvar : cvars)
+        ret.insert(std::make_pair(cvar.first, cvar.second->get()));
+    return ret;
 }
 
 void CVar::registerAll()

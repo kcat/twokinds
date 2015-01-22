@@ -15,6 +15,8 @@ public:
     virtual bool set(const std::string &value) = 0;
     virtual std::string get() const = 0;
 
+    static void setByName(const std::string &name, const std::string &value);
+    static std::map<std::string,std::string> getAll();
     static void registerAll();
 };
 
