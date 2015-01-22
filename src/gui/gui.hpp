@@ -51,6 +51,8 @@ public:
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
 
+    virtual void printToConsole(const std::string &str);
+
     virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate);
 
     Mode getMode() const;

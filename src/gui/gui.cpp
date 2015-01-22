@@ -190,6 +190,20 @@ namespace
 namespace TK
 {
 
+GuiIface *GuiIface::sInstance = nullptr;
+
+GuiIface::GuiIface()
+{
+    assert(!sInstance);
+    sInstance = this;
+}
+
+GuiIface::~GuiIface()
+{
+    sInstance = nullptr;
+}
+
+
 class Console {
     typedef CDelegate<const std::string&,const std::string&> CommandDelegate;
     typedef std::map<MyGUI::UString, CommandDelegate> MapDelegate;
@@ -385,6 +399,11 @@ public:
         MyGUI::PointerManager::getInstance().setVisible(active);
     }
 
+    void print(const std::string &str)
+    {
+        addToConsole(str);
+    }
+
     void addCommandCallback(const MyGUI::UString &command, CommandDelegate::DelegateT *delegate)
     {
         registerConsoleDelegate(command, delegate);
@@ -447,17 +466,22 @@ Gui::~Gui()
 }
 
 
+void Gui::printToConsole(const std::string &str)
+{
+    mConsole->print(str);
+}
+
+void Gui::addConsoleCallback(const char *command, CommandDelegateT *delegate)
+{
+    mConsole->addCommandCallback(command, delegate);
+}
+
+
 Gui::Mode Gui::getMode() const
 {
     if(mConsole->getActive())
         return Mode_Console;
     return Mode_Game;
-}
-
-
-void Gui::addConsoleCallback(const char *command, CommandDelegateT *delegate)
-{
-    mConsole->addCommandCallback(command, delegate);
 }
 
 

@@ -32,6 +32,7 @@
 #include "gui/gui.hpp"
 #include "terrain.hpp"
 #include "delegates.hpp"
+#include "cvars.hpp"
 
 
 namespace
@@ -510,6 +511,7 @@ bool Engine::go(void)
     mGui = new Gui(mWindow, mSceneMgr);
     for(const auto &cmd : mCommandFuncs)
         mGui->addConsoleCallback(cmd.first.c_str(), makeDelegate(this, &Engine::internalCommand));
+    CVar::registerAll();
 
     // Alter the camera aspect ratio to match the window
     mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
