@@ -5,6 +5,9 @@
 
 #include <SDL_keycode.h>
 
+#include "iface.hpp"
+
+
 namespace Ogre
 {
     class RenderWindow;
@@ -27,7 +30,7 @@ typedef IDelegate<const std::string&,const std::string&> CommandDelegateT;
 
 class Console;
 
-class Gui {
+class Gui : public GuiIface {
     MyGUI::OgrePlatform *mPlatform;
     MyGUI::Gui *mGui;
 
@@ -48,9 +51,9 @@ public:
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
 
-    Mode getMode() const;
+    virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate);
 
-    void addConsoleCallback(const char *command, CommandDelegateT *delegate);
+    Mode getMode() const;
 
     void updateStatus(const std::string &str);
 
