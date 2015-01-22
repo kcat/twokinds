@@ -12,7 +12,7 @@ public:
     CVar(std::string&& name);
     virtual ~CVar() { }
 
-    virtual void set(const std::string &value) = 0;
+    virtual bool set(const std::string &value) = 0;
     virtual std::string get() const = 0;
 
     static void registerAll();
@@ -24,7 +24,7 @@ class CVarString : public CVar {
 public:
     CVarString(std::string&& name, std::string value);
 
-    virtual void set(const std::string &value) final;
+    virtual bool set(const std::string &value) final;
     virtual std::string get() const final;
 };
 
@@ -34,7 +34,7 @@ class CVarBool : public CVar {
 public:
     CVarBool(std::string&& name, bool value);
 
-    virtual void set(const std::string &value) final;
+    virtual bool set(const std::string &value) final;
     virtual std::string get() const final;
 };
 
@@ -44,7 +44,7 @@ class CVarInt : public CVar {
 public:
     CVarInt(std::string&& name, int value);
 
-    virtual void set(const std::string &value) final;
+    virtual bool set(const std::string &value) final;
     virtual std::string get() const final;
 };
 

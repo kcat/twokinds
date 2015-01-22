@@ -41,7 +41,15 @@ public:
         if(cvar != mCVarRegistry.end())
         {
             if(!value.empty())
-                cvar->second->set(value);
+            {
+                if(!cvar->second->set(value))
+                {
+                    std::stringstream sstr;
+                    sstr<< "Invalid "<<name<<" value: "<<value;
+                    TK::GuiIface::get().printToConsole(sstr.str());
+                    return;
+                }
+            }
 
             std::stringstream sstr;
             sstr<< name<<" = "<<cvar->second->get();
@@ -86,12 +94,13 @@ CVarString::CVarString(std::string&& name, std::string value)
 {
 }
 
-void CVarString::set(const std::string &value)
+bool CVarString::set(const std::string &value)
 {
     if(!value.empty() && value.front() == '"' && value.back() == '"')
         mValue = value.substr(1, value.length()-2);
     else
         mValue = value;
+    return true;
 }
 
 std::string CVarString::get() const
@@ -105,18 +114,19 @@ CVarBool::CVarBool(std::string&& name, bool value)
 {
 }
 
-void CVarBool::set(const std::string &value)
+bool CVarBool::set(const std::string &value)
 {
     if(strcasecmp(value.c_str(), "true") == 0 || strcasecmp(value.c_str(), "yes") == 0 || strcasecmp(value.c_str(), "on") == 0)
-        mValue = true;
-    else if(strcasecmp(value.c_str(), "false") == 0 || strcasecmp(value.c_str(), "no") == 0 || strcasecmp(value.c_str(), "off") == 0)
-        mValue = false;
-    else
     {
-        std::stringstream sstr;
-        sstr<< "Invalid boolean value: "<<value<<" (expected true or false)";
-        GuiIface::get().printToConsole(sstr.str());
+        mValue = true;
+        return true;
     }
+    if(strcasecmp(value.c_str(), "false") == 0 || strcasecmp(value.c_str(), "no") == 0 || strcasecmp(value.c_str(), "off") == 0)
+    {
+        mValue = false;
+        return true;
+    }
+    return false;
 }
 
 std::string CVarBool::get() const
@@ -130,16 +140,12 @@ CVarInt::CVarInt(std::string&& name, int value)
 {
 }
 
-void CVarInt::set(const std::string &value)
+bool CVarInt::set(const std::string &value)
 {
-    if(Ogre::StringConverter::isNumber(value))
-        mValue = Ogre::StringConverter::parseInt(value);
-    else
-    {
-        std::stringstream sstr;
-        sstr<< "Invalid integer value: "<<value;
-        GuiIface::get().printToConsole(sstr.str());
-    }
+    if(!Ogre::StringConverter::isNumber(value))
+        return false;
+    mValue = Ogre::StringConverter::parseInt(value);
+    return true;
 }
 
 std::string CVarInt::get() const
