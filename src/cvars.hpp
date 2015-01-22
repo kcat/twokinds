@@ -2,7 +2,7 @@
 #define CVARS_HPP
 
 #include <string>
-#include <map>
+#include <unordered_map>
 
 namespace TK
 {
@@ -16,7 +16,7 @@ public:
     virtual std::string get() const = 0;
 
     static void setByName(const std::string &name, const std::string &value);
-    static std::map<std::string,std::string> getAll();
+    static std::unordered_map<std::string,std::string> getAll();
     static void registerAll();
 };
 
@@ -25,6 +25,8 @@ class CVarString : public CVar {
 
 public:
     CVarString(std::string&& name, std::string value);
+
+    const std::string& operator*() const { return mValue; }
 
     virtual bool set(const std::string &value) final;
     virtual std::string get() const final;
@@ -36,6 +38,8 @@ class CVarBool : public CVar {
 public:
     CVarBool(std::string&& name, bool value);
 
+    bool operator*() const { return mValue; }
+
     virtual bool set(const std::string &value) final;
     virtual std::string get() const final;
 };
@@ -45,6 +49,8 @@ class CVarInt : public CVar {
 
 public:
     CVarInt(std::string&& name, int value);
+
+    int operator*() const { return mValue; }
 
     virtual bool set(const std::string &value) final;
     virtual std::string get() const final;

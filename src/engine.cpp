@@ -109,6 +109,11 @@ public:
 namespace TK
 {
 
+CVAR(CVarInt, vid_width, 1280);
+CVAR(CVarInt, vid_height, 720);
+CVAR(CVarBool, vid_fullscreen, false);
+CVAR(CVarBool, vid_showfps, false);
+
 Engine::Engine(void)
   : mSDLWindow(nullptr)
   , mRoot(nullptr)
@@ -376,7 +381,7 @@ void Engine::saveCfgCmd(const std::string &value)
 {
     static const std::string default_cfg("twokinds.cfg");
     const std::string &cfg_name = (value.empty() ? default_cfg : value);
-    std::map<std::string,std::string> cvars = CVar::getAll();
+    auto cvars = CVar::getAll();
 
     mGui->printToConsole("Saving config "+cfg_name+"...");
     std::ofstream ocfg(cfg_name, std::ios::binary);
@@ -440,11 +445,13 @@ bool Engine::go(void)
         if(!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
             return false;
 
-        int width = 1280;
-        int height = 720;
+        int width = *vid_width;
+        int height = *vid_height;
         int xpos = SDL_WINDOWPOS_CENTERED;
         int ypos = SDL_WINDOWPOS_CENTERED;
         Uint32 flags = SDL_WINDOW_SHOWN;
+        if(*vid_fullscreen)
+            flags |= SDL_WINDOW_FULLSCREEN;
 
         mSDLWindow = SDL_CreateWindow("Twokinds", xpos, ypos, width, height, flags);
         if(mSDLWindow == nullptr)
@@ -617,7 +624,16 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
     }
 
     if(!mDisplayDebugStats)
-        mGui->updateStatus(std::string());
+    {
+        if(!*vid_showfps)
+            mGui->updateStatus(std::string());
+        else
+        {
+            std::stringstream status;
+            status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
+            mGui->updateStatus(status.str());
+        }
+    }
     else
     {
         std::stringstream status;
