@@ -27,6 +27,7 @@ public:
     CVarString(std::string&& name, std::string value);
 
     const std::string& operator*() const { return mValue; }
+    const std::string* operator->() const { return &mValue; }
 
     virtual bool set(const std::string &value) final;
     virtual std::string get() const final;

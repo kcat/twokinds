@@ -114,6 +114,8 @@ CVAR(CVarInt, vid_height, 720);
 CVAR(CVarBool, vid_fullscreen, false);
 CVAR(CVarBool, vid_showfps, false);
 
+CVAR(CVarString, r_rendersystem, "");
+
 Engine::Engine(void)
   : mSDLWindow(nullptr)
   , mRoot(nullptr)
@@ -441,9 +443,28 @@ bool Engine::go(void)
             // Ignore if config file not found
         }
 
-        // Show the configuration dialog and initialise the system
-        if(!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
-            return false;
+        Ogre::RenderSystem *rsys = nullptr;
+        if(!r_rendersystem->empty())
+        {
+            if(!(rsys=mRoot->getRenderSystemByName(*r_rendersystem)))
+                Ogre::LogManager::getSingleton().stream()<< "Render system \""<<*r_rendersystem<<"\" not found";
+        }
+        if(!rsys)
+        {
+            const Ogre::RenderSystemList &renderers = mRoot->getAvailableRenderers();
+            for(Ogre::RenderSystem *renderer : renderers)
+            {
+                if(!rsys) rsys = renderer;
+                Ogre::LogManager::getSingleton().stream()<< "Found renderer \""<<renderer->getName()<<"\"";
+            }
+        }
+        if(!rsys)
+            throw std::runtime_error("Failed to find a usable RenderSystem");
+        const Ogre::String &err = rsys->validateConfigOptions();
+        if(!err.empty())
+            throw std::runtime_error("RenderSystem config error: "+err);
+        mRoot->setRenderSystem(rsys);
+
 
         int width = *vid_width;
         int height = *vid_height;
