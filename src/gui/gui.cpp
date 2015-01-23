@@ -124,7 +124,7 @@ namespace
         {SDLK_KP_PERIOD, MyGUI::KeyCode::Decimal},
 
         {SDLK_LCTRL, MyGUI::KeyCode::LeftControl},
-        {SDLK_LSHIFT, MyGUI::KeyCode::RightControl},
+        {SDLK_LSHIFT, MyGUI::KeyCode::LeftShift},
         {SDLK_LALT, MyGUI::KeyCode::LeftAlt},
         {SDLK_LGUI, MyGUI::KeyCode::LeftWindows},
         {SDLK_RCTRL, MyGUI::KeyCode::RightControl},
