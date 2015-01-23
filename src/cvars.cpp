@@ -10,6 +10,7 @@
 
 #include "gui/iface.hpp"
 #include "delegates.hpp"
+#include "log.hpp"
 
 
 namespace
@@ -49,24 +50,25 @@ public:
             {
                 if(!cvar->second->set(value))
                 {
-                    std::stringstream sstr;
-                    sstr<< "Invalid "<<name<<" value: "<<value;
-                    TK::GuiIface::get().printToConsole(sstr.str());
+                    TK::Log::get().stream(TK::Log::Level_Error)<< "Invalid "<<name<<" value: "<<value;
                     return;
                 }
             }
 
-            std::stringstream sstr;
-            sstr<< name<<" = "<<cvar->second->get();
-            TK::GuiIface::get().printToConsole(sstr.str());
+            TK::Log::get().stream()<< name<<" = "<<cvar->second->get();
         }
     }
 
     void loadCVarValue(const std::string &name, const std::string &value)
     {
         auto cvar = mCVarRegistry.find(name);
-        if(cvar != mCVarRegistry.end())
-            cvar->second->set(value);
+        if(cvar == mCVarRegistry.end())
+            TK::Log::get().stream(TK::Log::Level_Error)<< "CVar "<<name<<" does not exist.";
+        else
+        {
+            if(!cvar->second->set(value))
+                TK::Log::get().stream(TK::Log::Level_Error)<< "Invalid "<<name<<" value: "<<value;
+        }
     }
 
     void initialize()

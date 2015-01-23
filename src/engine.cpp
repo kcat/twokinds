@@ -33,6 +33,7 @@
 #include "terrain.hpp"
 #include "delegates.hpp"
 #include "cvars.hpp"
+#include "log.hpp"
 
 
 namespace
@@ -131,11 +132,17 @@ Engine::Engine(void)
       { "qqq", &Engine::quitCmd },
     }
 {
+    Ogre::LogManager *logMgr = OGRE_NEW Ogre::LogManager();
+    logMgr->createLog("twokinds.log", true);
+
+    Log::get().setLog(logMgr->getDefaultLog());
 }
 
 Engine::~Engine(void)
 {
     World::get().deinitialize();
+
+    Log::get().setGuiIface(nullptr);
 
     delete mGui;
     mGui = nullptr;
@@ -167,6 +174,8 @@ Engine::~Engine(void)
         delete mRoot;
         mRoot = nullptr;
     }
+    Log::get().setLog(nullptr);
+    OGRE_DELETE Ogre::LogManager::getSingletonPtr();
 
     if(mSDLWindow)
     {
@@ -385,7 +394,7 @@ void Engine::saveCfgCmd(const std::string &value)
     const std::string &cfg_name = (value.empty() ? default_cfg : value);
     auto cvars = CVar::getAll();
 
-    mGui->printToConsole("Saving config "+cfg_name+"...");
+    Log::get().stream()<< "Saving config "<<cfg_name<<"...";
     std::ofstream ocfg(cfg_name, std::ios::binary);
     if(!ocfg.is_open())
         throw std::runtime_error("Failed to open "+cfg_name+" for writing");
@@ -417,7 +426,7 @@ bool Engine::go(void)
     }
 
     // Construct Ogre::Root
-    mRoot = new Ogre::Root("plugins.cfg", "ogre.cfg", "ogre.log");
+    mRoot = new Ogre::Root("plugins.cfg", Ogre::String(), Ogre::String());
 
     Ogre::ArchiveManager::getSingleton().addArchiveFactory(new PhysFSFactory);
 
@@ -447,7 +456,7 @@ bool Engine::go(void)
         if(!r_rendersystem->empty())
         {
             if(!(rsys=mRoot->getRenderSystemByName(*r_rendersystem)))
-                Ogre::LogManager::getSingleton().stream()<< "Render system \""<<*r_rendersystem<<"\" not found";
+                Log::get().stream()<< "Render system \""<<*r_rendersystem<<"\" not found";
         }
         if(!rsys)
         {
@@ -455,11 +464,13 @@ bool Engine::go(void)
             for(Ogre::RenderSystem *renderer : renderers)
             {
                 if(!rsys) rsys = renderer;
-                Ogre::LogManager::getSingleton().stream()<< "Found renderer \""<<renderer->getName()<<"\"";
+                Log::get().stream()<< "Found renderer \""<<renderer->getName()<<"\"";
             }
         }
         if(!rsys)
             throw std::runtime_error("Failed to find a usable RenderSystem");
+        // Force the fixed-function pipeline off
+        rsys->setConfigOption("Fixed Pipeline Enabled", "No");
         const Ogre::String &err = rsys->validateConfigOptions();
         if(!err.empty())
             throw std::runtime_error("RenderSystem config error: "+err);
@@ -477,8 +488,9 @@ bool Engine::go(void)
         mSDLWindow = SDL_CreateWindow("Twokinds", xpos, ypos, width, height, flags);
         if(mSDLWindow == nullptr)
         {
-            std::cerr<< "SDL_CreateWindow Error: "<<SDL_GetError() <<std::endl;
-            return false;
+            std::stringstream sstr;
+            sstr<< "SDL_CreateWindow Error: "<<SDL_GetError();
+            throw std::runtime_error(sstr.str());
         }
 
         mRoot->initialise(false);
@@ -573,6 +585,7 @@ bool Engine::go(void)
 
     // Setup GUI subsystem
     mGui = new Gui(mWindow, mSceneMgr);
+    Log::get().setGuiIface(mGui);
     for(const auto &cmd : mCommandFuncs)
         mGui->addConsoleCallback(cmd.first.c_str(), makeDelegate(this, &Engine::internalCommand));
     CVar::registerAll();
@@ -600,6 +613,8 @@ bool Engine::go(void)
     // And away we go!
     mRoot->addFrameListener(this);
     mRoot->startRendering();
+
+    saveCfgCmd(std::string());
 
     return true;
 }

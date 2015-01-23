@@ -8,6 +8,7 @@
 #include <SDL_mouse.h>
 
 #include "delegates.hpp"
+#include "log.hpp"
 
 
 namespace
@@ -525,7 +526,7 @@ void Gui::mousePressed(int x, int y, int button)
         btn = MyGUI::MouseButton::Button4;
     else
     {
-        Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL mouse button: "<<button;
+        Log::get().stream(Log::Level_Error)<< "Unexpected SDL mouse button: "<<button;
         return;
     }
     MyGUI::InputManager::getInstance().injectMousePress(x, y, btn);
@@ -560,7 +561,7 @@ void Gui::injectKeyPress(SDL_Keycode code)
         MyGUI::InputManager::getInstance().injectKeyPress(key->second, 0);
     }
     else
-        Ogre::LogManager::getSingleton().stream()<< "Unexpected SDL keycode: "<<code;
+        Log::get().stream(Log::Level_Error)<< "Unexpected SDL keycode: "<<code;
 }
 
 void Gui::injectKeyRelease(SDL_Keycode code)
