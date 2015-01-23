@@ -144,12 +144,12 @@ CVarBool::CVarBool(std::string&& name, bool value)
 
 bool CVarBool::set(const std::string &value)
 {
-    if(strcasecmp(value.c_str(), "true") == 0 || strcasecmp(value.c_str(), "yes") == 0 || strcasecmp(value.c_str(), "on") == 0)
+    if(strcasecmp(value.c_str(), "true") == 0 || strcasecmp(value.c_str(), "yes") == 0 || strcasecmp(value.c_str(), "on") == 0 || value == "1")
     {
         mValue = true;
         return true;
     }
-    if(strcasecmp(value.c_str(), "false") == 0 || strcasecmp(value.c_str(), "no") == 0 || strcasecmp(value.c_str(), "off") == 0)
+    if(strcasecmp(value.c_str(), "false") == 0 || strcasecmp(value.c_str(), "no") == 0 || strcasecmp(value.c_str(), "off") == 0 || value == "0")
     {
         mValue = false;
         return true;
