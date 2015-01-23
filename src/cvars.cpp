@@ -55,7 +55,7 @@ public:
                 }
             }
 
-            TK::Log::get().stream()<< name<<" = "<<cvar->second->get();
+            TK::Log::get().stream()<< name<<" = \""<<cvar->second->get()<<"\"";
         }
     }
 
