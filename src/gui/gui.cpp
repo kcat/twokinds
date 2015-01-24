@@ -381,6 +381,7 @@ public:
         mComboCommand = getWidget<MyGUI::ComboBox>("combo_Command");
         mButtonSubmit = getWidget<MyGUI::Button>("button_Submit");
 
+        mMainWidget->setRealCoord(MyGUI::FloatCoord(0.125f, 0.0f, 0.75f, 0.5f));
         mMainWidget->setVisible(false);
         mMainWidget->setEnabled(false);
 
