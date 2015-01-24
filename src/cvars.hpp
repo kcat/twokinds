@@ -2,7 +2,7 @@
 #define CVARS_HPP
 
 #include <string>
-#include <unordered_map>
+#include <map>
 
 namespace TK
 {
@@ -16,7 +16,7 @@ public:
     virtual std::string get() const = 0;
 
     static void setByName(const std::string &name, const std::string &value);
-    static std::unordered_map<std::string,std::string> getAll();
+    static std::map<std::string,std::string> getAll();
     static void registerAll();
 };
 

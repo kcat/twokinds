@@ -19,7 +19,7 @@ namespace
 class CVarRegistry {
     static CVarRegistry *sSingleton;
 
-    std::unordered_map<std::string,TK::CVar*> mCVarRegistry;
+    std::map<std::string,TK::CVar*> mCVarRegistry;
     CVarRegistry()
     {
         assert(!sSingleton);
@@ -36,7 +36,7 @@ public:
         mCVarRegistry.insert(std::make_pair(std::move(name), cvar));
     }
 
-    const std::unordered_map<std::string,TK::CVar*>& getAll() const
+    const std::map<std::string,TK::CVar*>& getAll() const
     {
         return mCVarRegistry;
     }
@@ -102,9 +102,9 @@ void CVar::setByName(const std::string &name, const std::string &value)
     CVarRegistry::getSingleton().loadCVarValue(name, value);
 }
 
-std::unordered_map<std::string,std::string> CVar::getAll()
+std::map<std::string,std::string> CVar::getAll()
 {
-    std::unordered_map<std::string,std::string> ret;
+    std::map<std::string,std::string> ret;
     const auto &cvars = CVarRegistry::getSingleton().getAll();
     for(const auto &cvar : cvars)
         ret.insert(std::make_pair(cvar.first, cvar.second->get()));
