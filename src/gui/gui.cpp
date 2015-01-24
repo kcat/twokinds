@@ -218,12 +218,6 @@ class Console {
 
     MapDelegate mDelegates;
 
-    MyGUI::UString mStringCurrent;
-    MyGUI::UString mStringError;
-    MyGUI::UString mStringSuccess;
-    MyGUI::UString mStringUnknown;
-    MyGUI::UString mStringFormat;
-
 
     template<typename T=MyGUI::Widget>
     T *getWidget(const char *name)
@@ -266,7 +260,7 @@ class Console {
         if(iter != mDelegates.end())
             iter->second(key, value);
         else
-            addToConsole(mStringUnknown + "'" + key + "'");
+            addToConsole("#FF0000unknown command : #000000'"+key+"'");
 
         _sender->setCaption("");
     }
@@ -374,12 +368,6 @@ class Console {
         addToConsole(MyGUI::utility::toString(_reason, "'", _key, " ", _value, "'"));
     }
 
-    const MyGUI::UString& getConsoleStringCurrent() const { return mStringCurrent; }
-    const MyGUI::UString& getConsoleStringError() const { return mStringError; }
-    const MyGUI::UString& getConsoleStringSuccess() const { return mStringSuccess; }
-    const MyGUI::UString& getConsoleStringUnknown() const { return mStringUnknown; }
-    const MyGUI::UString& getConsoleStringFormat() const { return mStringFormat; }
-
 public:
     Console(const std::string &layout_name)
       : mWidgets(MyGUI::LayoutManager::getInstance().loadLayout(layout_name))
@@ -399,12 +387,6 @@ public:
         MyGUI::Window *window = mMainWidget->castType<MyGUI::Window>(false);
         if(window != nullptr)
             window->eventWindowButtonPressed += newDelegate(this, &Console::notifyWindowButtonPressed);
-
-        mStringCurrent = mMainWidget->getUserString("Current");
-        mStringError = mMainWidget->getUserString("Error");
-        mStringSuccess = mMainWidget->getUserString("Success");
-        mStringUnknown = mMainWidget->getUserString("Unknown");
-        mStringFormat = mMainWidget->getUserString("Format");
 
         mComboCommand->eventComboAccept += newDelegate(this, &Console::notifyComboAccept);
         mComboCommand->eventKeyButtonPressed += newDelegate(this, &Console::notifyButtonPressed);
