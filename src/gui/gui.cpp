@@ -224,7 +224,6 @@ class Console {
     MyGUI::UString mStringUnknown;
     MyGUI::UString mStringFormat;
 
-    bool mAutoCompleted;
 
     template<typename T=MyGUI::Widget>
     T *getWidget(const char *name)
@@ -274,31 +273,55 @@ class Console {
 
     void notifyButtonPressed(MyGUI::Widget *_sender, MyGUI::KeyCode _key, MyGUI::Char _char)
     {
-        MyGUI::EditBox* edit = _sender->castType<MyGUI::EditBox>();
-        size_t len = edit->getCaption().length();
-        if(_key == MyGUI::KeyCode::Backspace && len > 0 && mAutoCompleted)
-        {
-            edit->deleteTextSelection();
-            len = edit->getCaption().length();
-            edit->eraseText(len - 1);
-        }
-
+        MyGUI::EditBox *edit = _sender->castType<MyGUI::EditBox>();
         MyGUI::UString command = edit->getCaption();
         if(command.empty()) return;
 
-        for(MapDelegate::iterator iter = mDelegates.begin(); iter != mDelegates.end(); ++iter)
+        if(_key == MyGUI::KeyCode::Tab)
         {
-            if(iter->first.find(command) == 0)
+            // Build a space-separated list of all commands that start with
+            // 'command'. Also, find the largest string portion that matches
+            // those commands.
+            std::stringstream sstr;
+            MyGUI::UString matching;
+            MapDelegate::iterator iter = mDelegates.begin();
+            for(;iter != mDelegates.end();++iter)
             {
-                if(command == iter->first)
+                if(iter->first.find(command) == 0)
+                {
+                    sstr<< iter->first;
+                    matching = iter->first;
+                    ++iter;
                     break;
-                edit->setCaption(iter->first);
-                edit->setTextSelection(command.length(), iter->first.length());
-                mAutoCompleted = true;
-                return;
+                }
+            }
+            for(;iter != mDelegates.end();++iter)
+            {
+                if(iter->first.find(command) == 0)
+                {
+                    sstr<< " "<<iter->first;
+
+                    size_t len = std::min(matching.length(), iter->first.length());
+                    auto nonmatch = std::mismatch(matching.begin(), matching.begin()+len, iter->first.begin(),
+                                                  std::equal_to<MyGUI::UString::value_type>()).first;
+                    if(nonmatch != matching.end())
+                        matching.erase(nonmatch, matching.end());
+                }
+            }
+
+            if(sstr.tellp() == 0)
+                Log::get().stream()<< "No matches for \""<<command<<"\"";
+            else
+            {
+                std::string str = sstr.str();
+                if(str == matching.asUTF8())
+                    matching.push_back(' ');
+                else
+                    Log::get().stream()<< "Auto-complete list for \""<<command<<"\":\n"<<str;
+                if(matching.length() > command.length())
+                    edit->setCaption(matching);
             }
         }
-        mAutoCompleted = false;
     }
 
     void addToConsole(const MyGUI::UString &_line)
@@ -364,7 +387,6 @@ public:
       , mListHistory(nullptr)
       , mComboCommand(nullptr)
       , mButtonSubmit(nullptr)
-      , mAutoCompleted(false)
     {
         mMainWidget = getWidget("_Main");
         mListHistory = getWidget<MyGUI::EditBox>("list_History");
