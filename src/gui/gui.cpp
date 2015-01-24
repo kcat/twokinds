@@ -392,7 +392,6 @@ public:
         mComboCommand->eventComboAccept += newDelegate(this, &Console::notifyComboAccept);
         mComboCommand->eventKeyButtonPressed += newDelegate(this, &Console::notifyButtonPressed);
         mButtonSubmit->eventMouseButtonClick += newDelegate(this, &Console::notifyMouseButtonClick);
-        mListHistory->setOverflowToTheLeft(true);
 
         registerConsoleDelegate("clear", makeDelegate(this, &Console::internalCommand));
     }
