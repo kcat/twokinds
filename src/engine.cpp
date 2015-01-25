@@ -398,6 +398,7 @@ void Engine::saveCfgCmd(const std::string &value)
     std::ofstream ocfg(cfg_name, std::ios::binary);
     if(!ocfg.is_open())
         throw std::runtime_error("Failed to open "+cfg_name+" for writing");
+
     ocfg<< "[CVars]" <<std::endl;
     for(const auto &cvar : cvars)
         ocfg<< cvar.first<<" = "<<cvar.second <<std::endl;
@@ -514,7 +515,7 @@ bool Engine::go(void)
 
         Ogre::StringVector paths = cf.getMultiSetting("source", "General");
         for(const auto &path : paths)
-            PhysFSFactory::getSingleton().Mount(path.c_str());
+            PhysFSFactory::getSingleton().addPath(path.c_str());
 
         // Go through all sections & settings in the file
         Ogre::ConfigFile::SectionIterator seci = cf.getSectionIterator();

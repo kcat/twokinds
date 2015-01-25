@@ -9,6 +9,9 @@
 
 #include "physfs.h"
 
+#include "log.hpp"
+
+
 #if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
 #define const_OGRE2 const
 #else
@@ -269,13 +272,11 @@ void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
     delete inst;
 }
 
-void PhysFSFactory::Mount(const char *path, const char *mountPoint, bool append) const
+void PhysFSFactory::addPath(const char *path, const char *mountPoint, bool append) const
 {
-    auto &logMgr = Ogre::LogManager::getSingleton();
-    logMgr.stream()<< "Adding new file source "<<path<<" to "<<(mountPoint?mountPoint:"<root>")<<"...";
-
+    Log::get().stream()<< "Adding "<<path<<" to "<<(mountPoint?mountPoint:"<root>")<<"...";
     if(PHYSFS_mount(path, mountPoint, append) == 0)
-        logMgr.stream(Ogre::LML_CRITICAL)<< "Failed to add "<<path<<": "<<PHYSFS_getLastError();
+        Log::get().stream(Log::Level_Error)<< "Failed to add "<<path<<": "<<PHYSFS_getLastError();
 }
 
 } // namespace TK
