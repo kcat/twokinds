@@ -135,7 +135,8 @@ Engine::Engine(void)
     Ogre::LogManager *logMgr = OGRE_NEW Ogre::LogManager();
     logMgr->createLog("twokinds.log", true);
 
-    Log::get().setLog(logMgr->getDefaultLog());
+    new Log(Log::Level_Normal, logMgr->getDefaultLog());
+    Log::get().message("--- Starting log ---");
 }
 
 Engine::~Engine(void)
@@ -185,6 +186,8 @@ Engine::~Engine(void)
         mSDLWindow = nullptr;
     }
     SDL_Quit();
+
+    delete Log::getPtr();
 }
 
 

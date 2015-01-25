@@ -7,6 +7,9 @@
 
 #include <OgreLog.h>
 
+#include "singleton.hpp"
+
+
 namespace TK
 {
 
@@ -14,9 +17,7 @@ class GuiIface;
 
 class LogStream;
 
-class Log {
-    static Log sInstance;
-
+class Log : public Singleton<Log> {
 public:
     enum Level {
         Level_Debug,
@@ -30,10 +31,11 @@ private:
     GuiIface *mGui;
     std::vector<std::string> mBuffer;
 
-    Log() : mLevel(Level_Normal), mLog(nullptr), mGui(nullptr)
+public:
+    Log(Level level=Level_Normal, Ogre::Log *log=nullptr)
+      : mLevel(level), mLog(log), mGui(nullptr)
     { }
 
-public:
     void setLog(Ogre::Log *log) { mLog = log; }
     void setLevel(Level level) { mLevel = level; }
 
@@ -41,9 +43,6 @@ public:
 
     LogStream stream(Level level=Level_Normal);
     void message(const std::string &msg, Level level=Level_Normal);
-
-    static Log& get() { return sInstance; }
-    static Log* getPtr() { return &sInstance; }
 };
 
 class LogStream {

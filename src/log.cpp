@@ -6,7 +6,9 @@
 namespace TK
 {
 
-Log Log::sInstance;
+template<>
+Log *Singleton<Log>::sInstance = nullptr;
+
 
 void Log::setGuiIface(GuiIface *iface)
 {

@@ -191,18 +191,8 @@ namespace
 namespace TK
 {
 
-GuiIface *GuiIface::sInstance = nullptr;
-
-GuiIface::GuiIface()
-{
-    assert(!sInstance);
-    sInstance = this;
-}
-
-GuiIface::~GuiIface()
-{
-    sInstance = nullptr;
-}
+template<>
+GuiIface *Singleton<GuiIface>::sInstance = nullptr;
 
 
 class Console {

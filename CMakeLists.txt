@@ -110,6 +110,7 @@ set(HDRS src/archives/physfs.hpp
          src/cvars.hpp
          src/engine.hpp
          src/delegates.hpp
+         src/singleton.hpp
 )
 
 set(SRCS src/archives/physfs.cpp

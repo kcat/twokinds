@@ -17,20 +17,14 @@ namespace
 {
 
 class CVarRegistry {
-    static CVarRegistry *sSingleton;
-
     std::map<std::string,TK::CVar*> mCVarRegistry;
-    CVarRegistry()
-    {
-        assert(!sSingleton);
-        sSingleton = this;
-    }
-public:
-    ~CVarRegistry()
-    {
-        sSingleton = nullptr;
-    }
 
+    CVarRegistry(const CVarRegistry&) = delete;
+    CVarRegistry& operator=(const CVarRegistry&) = delete;
+
+    CVarRegistry() { }
+
+public:
     void add(std::string&& name, TK::CVar *cvar)
     {
         mCVarRegistry.insert(std::make_pair(std::move(name), cvar));
@@ -84,7 +78,6 @@ public:
         return instance;
     }
 };
-CVarRegistry *CVarRegistry::sSingleton = nullptr;
 
 } // namespace
 

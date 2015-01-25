@@ -3,24 +3,20 @@
 
 #include <string>
 
+#include "singleton.hpp"
+
+
 namespace TK
 {
 
 template<typename ...Args> class IDelegate;
 typedef IDelegate<const std::string&,const std::string&> CommandDelegateT;
 
-class GuiIface {
-    static GuiIface *sInstance;
-
+class GuiIface : public Singleton<GuiIface> {
 public:
-    GuiIface();
-    virtual ~GuiIface();
-
     virtual void printToConsole(const std::string &str) = 0;
 
     virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate) = 0;
-
-    static GuiIface& get() { return *sInstance; }
 };
 
 } // namespace TK
