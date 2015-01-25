@@ -117,7 +117,7 @@ CVarString::CVarString(std::string&& name, std::string&& value)
 
 bool CVarString::set(const std::string &value)
 {
-    if(!value.empty() && value.front() == '"' && value.back() == '"')
+    if(value.length() >= 2 && value.front() == '"' && value.back() == '"')
         mValue = value.substr(1, value.length()-2);
     else
         mValue = value;
