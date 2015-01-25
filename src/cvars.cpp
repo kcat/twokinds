@@ -110,7 +110,7 @@ void CVar::registerAll()
 }
 
 
-CVarString::CVarString(std::string&& name, std::string value)
+CVarString::CVarString(std::string&& name, std::string&& value)
   : CVar(std::move(name)), mValue(value)
 {
 }

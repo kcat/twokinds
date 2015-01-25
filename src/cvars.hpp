@@ -24,7 +24,7 @@ class CVarString : public CVar {
     std::string mValue;
 
 public:
-    CVarString(std::string&& name, std::string value);
+    CVarString(std::string&& name, std::string&& value);
 
     const std::string& operator*() const { return mValue; }
     const std::string* operator->() const { return &mValue; }
