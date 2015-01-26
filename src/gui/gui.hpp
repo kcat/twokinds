@@ -25,9 +25,6 @@ namespace MyGUI
 namespace TK
 {
 
-template<typename ...Args> class IDelegate;
-typedef IDelegate<const std::string&,const std::string&> CommandDelegateT;
-
 class Console;
 
 class Gui : public GuiIface {
