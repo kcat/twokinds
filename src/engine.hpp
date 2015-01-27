@@ -26,6 +26,7 @@ namespace Ogre
 namespace TK
 {
 
+class Input;
 class Gui;
 
 class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
@@ -41,6 +42,7 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::Camera *mCamera;
     Ogre::Viewport *mViewport; // Not used with Ogre 2.0!
 
+    Input *mInput;
     Gui *mGui;
 
     bool mDisplayDebugStats;
@@ -50,11 +52,6 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
-    void handleMouseMotionEvent(const SDL_MouseMotionEvent &evt);
-    void handleMouseWheelEvent(const SDL_MouseWheelEvent &evt);
-    void handleMouseButtonEvent(const SDL_MouseButtonEvent &evt);
-    void handleKeyboardEvent(const SDL_KeyboardEvent &evt);
-    void handleTextInputEvent(const SDL_TextInputEvent &evt);
     bool pumpEvents();
 
     void quitCmd(const std::string &value);

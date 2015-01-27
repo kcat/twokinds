@@ -29,6 +29,7 @@
 #include <SDL_syswm.h>
 
 #include "archives/physfs.hpp"
+#include "input/input.hpp"
 #include "gui/gui.hpp"
 #include "terrain.hpp"
 #include "delegates.hpp"
@@ -124,6 +125,7 @@ Engine::Engine(void)
   , mSceneMgr(nullptr)
   , mCamera(nullptr)
   , mViewport(nullptr)
+  , mInput(nullptr)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
@@ -147,6 +149,9 @@ Engine::~Engine(void)
 
     delete mGui;
     mGui = nullptr;
+
+    delete mInput;
+    mInput = nullptr;
 
     if(mRoot)
     {
@@ -286,58 +291,6 @@ void Engine::handleWindowEvent(const SDL_WindowEvent &evt)
     }
 }
 
-void Engine::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
-{
-    mGui->mouseMoved(evt.x, evt.y);
-
-    if(mGui->getMode() == Gui::Mode_Game)
-    {
-        /* HACK: mouse moves the camera around */
-        if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
-        {
-            static float x=0.0f, y=0.0f;
-            /* Rotation (x motion rotates around y, y motion rotates around x) */
-            x += evt.yrel * 0.1f;
-            y += evt.xrel * 0.1f;
-
-            Ogre::Matrix3 mat3;
-            mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-            mCamera->setOrientation(mat3);
-        }
-    }
-}
-
-void Engine::handleMouseWheelEvent(const SDL_MouseWheelEvent &evt)
-{
-    mGui->mouseWheel(evt.y);
-}
-
-void Engine::handleMouseButtonEvent(const SDL_MouseButtonEvent &evt)
-{
-    if(evt.state == SDL_PRESSED)
-        mGui->mousePressed(evt.x, evt.y, evt.button);
-    else if(evt.state == SDL_RELEASED)
-        mGui->mouseReleased(evt.x, evt.y, evt.button);
-}
-
-void Engine::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
-{
-    if(evt.state == SDL_PRESSED)
-    {
-        if(!evt.repeat)
-            mGui->injectKeyPress(evt.keysym.sym);
-        if(evt.keysym.sym == SDLK_F1)
-            mDisplayDebugStats = !mDisplayDebugStats;
-    }
-    else if(evt.state == SDL_RELEASED)
-        mGui->injectKeyRelease(evt.keysym.sym);
-}
-
-void Engine::handleTextInputEvent(const SDL_TextInputEvent &evt)
-{
-    mGui->injectTextInput(evt.text);
-}
-
 bool Engine::pumpEvents()
 {
     SDL_PumpEvents();
@@ -352,22 +305,37 @@ bool Engine::pumpEvents()
             break;
 
         case SDL_MOUSEMOTION:
-            handleMouseMotionEvent(evt.motion);
+            mInput->handleMouseMotionEvent(evt.motion);
+            if(mGui->getMode() == Gui::Mode_Game)
+            {
+                /* HACK: mouse moves the camera around */
+                if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
+                {
+                    static float x=0.0f, y=0.0f;
+                    /* Rotation (x motion rotates around y, y motion rotates around x) */
+                    x += evt.motion.yrel * 0.1f;
+                    y += evt.motion.xrel * 0.1f;
+
+                    Ogre::Matrix3 mat3;
+                    mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+                    mCamera->setOrientation(mat3);
+                }
+            }
             break;
         case SDL_MOUSEWHEEL:
-            handleMouseWheelEvent(evt.wheel);
+            mInput->handleMouseWheelEvent(evt.wheel);
             break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
-            handleMouseButtonEvent(evt.button);
+            mInput->handleMouseButtonEvent(evt.button);
             break;
 
         case SDL_KEYDOWN:
         case SDL_KEYUP:
-            handleKeyboardEvent(evt.key);
+            mInput->handleKeyboardEvent(evt.key);
             break;
         case SDL_TEXTINPUT:
-            handleTextInputEvent(evt.text);
+            mInput->handleTextInputEvent(evt.text);
             break;
 
         case SDL_QUIT:
@@ -586,6 +554,9 @@ bool Engine::go(void)
     mViewport = mWindow->addViewport(mCamera);
     mViewport->setMaterialScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 #endif
+
+    // Setup Input subsystem
+    mInput = new Input();
 
     // Setup GUI subsystem
     mGui = new Gui(mWindow, mSceneMgr);

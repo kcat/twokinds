@@ -1,11 +1,9 @@
 #ifndef GUI_GUI_HPP
 #define GUI_GUI_HPP
 
-#include <string>
-
-#include <SDL_keycode.h>
-
 #include "iface.hpp"
+
+#include <string>
 
 
 namespace Ogre
@@ -40,11 +38,6 @@ class Gui : public GuiIface {
     int mMouseZ;
 
 public:
-    enum Mode {
-        Mode_Game,
-        Mode_Console
-    };
-
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
 
@@ -52,17 +45,17 @@ public:
 
     virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate);
 
-    Mode getMode() const;
+    virtual Mode getMode() const;
+
+    virtual void mouseMoved(int x, int y);
+    virtual void mouseWheel(int z); /* Value is relative */
+    virtual void mousePressed(int x, int y, int button);
+    virtual void mouseReleased(int x, int y, int button);
+    virtual void injectKeyPress(SDL_Keycode code);
+    virtual void injectKeyRelease(SDL_Keycode code);
+    virtual void injectTextInput(const char *text);
 
     void updateStatus(const std::string &str);
-
-    void mouseMoved(int x, int y);
-    void mouseWheel(int z); /* Value is relative */
-    void mousePressed(int x, int y, int button);
-    void mouseReleased(int x, int y, int button);
-    void injectKeyPress(SDL_Keycode code);
-    void injectKeyRelease(SDL_Keycode code);
-    void injectTextInput(const char *text);
 };
 
 } // namespace TK
