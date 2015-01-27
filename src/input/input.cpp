@@ -13,6 +13,9 @@ InputIface *Singleton<InputIface>::sInstance = nullptr;
 
 
 Input::Input()
+  : mMouseX(0)
+  , mMouseY(0)
+  , mMouseZ(0)
 {
 }
 
@@ -23,12 +26,15 @@ Input::~Input()
 
 void Input::handleMouseMotionEvent(const SDL_MouseMotionEvent &evt)
 {
-    GuiIface::get().mouseMoved(evt.x, evt.y);
+    mMouseX = evt.x;
+    mMouseY = evt.y;
+    GuiIface::get().mouseMoved(mMouseX, mMouseY, mMouseZ);
 }
 
 void Input::handleMouseWheelEvent(const SDL_MouseWheelEvent &evt)
 {
-    GuiIface::get().mouseWheel(evt.y);
+    mMouseZ += evt.y;
+    GuiIface::get().mouseMoved(mMouseX, mMouseY, mMouseZ);
 }
 
 void Input::handleMouseButtonEvent(const SDL_MouseButtonEvent &evt)

@@ -27,8 +27,7 @@ public:
 
     virtual Mode getMode() const = 0;
 
-    virtual void mouseMoved(int x, int y) = 0;
-    virtual void mouseWheel(int z) = 0; /* Value is relative */
+    virtual void mouseMoved(int x, int y, int z) = 0;
     virtual void mousePressed(int x, int y, int button) = 0;
     virtual void mouseReleased(int x, int y, int button) = 0;
     virtual void injectKeyPress(SDL_Keycode code) = 0;

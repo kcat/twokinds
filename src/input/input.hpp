@@ -14,6 +14,10 @@ namespace TK
 {
 
 class Input : public InputIface {
+    int mMouseX;
+    int mMouseY;
+    int mMouseZ;
+
 public:
     Input();
     virtual ~Input();

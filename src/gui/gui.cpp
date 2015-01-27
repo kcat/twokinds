@@ -409,9 +409,6 @@ public:
 
 
 Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
-  : mMouseX(0)
-  , mMouseY(0)
-  , mMouseZ(0)
 {
     try {
         mPlatform = new MyGUI::OgrePlatform();
@@ -494,17 +491,9 @@ void Gui::updateStatus(const std::string &str)
 }
 
 
-void Gui::mouseMoved(int x, int y)
+void Gui::mouseMoved(int x, int y, int z)
 {
-    mMouseX = x;
-    mMouseY = y;
-    MyGUI::InputManager::getInstance().injectMouseMove(mMouseX, mMouseY, mMouseZ);
-}
-
-void Gui::mouseWheel(int z)
-{
-    mMouseZ += z;
-    MyGUI::InputManager::getInstance().injectMouseMove(mMouseX, mMouseY, mMouseZ);
+    MyGUI::InputManager::getInstance().injectMouseMove(x, y, z);
 }
 
 void Gui::mousePressed(int x, int y, int button)
