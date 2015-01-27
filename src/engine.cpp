@@ -309,17 +309,14 @@ bool Engine::pumpEvents()
             if(mGui->getMode() == Gui::Mode_Game)
             {
                 /* HACK: mouse moves the camera around */
-                if((SDL_GetMouseState(NULL, NULL)&SDL_BUTTON_LMASK))
-                {
-                    static float x=0.0f, y=0.0f;
-                    /* Rotation (x motion rotates around y, y motion rotates around x) */
-                    x += evt.motion.yrel * 0.1f;
-                    y += evt.motion.xrel * 0.1f;
+                static float x=0.0f, y=0.0f;
+                /* Rotation (x motion rotates around y, y motion rotates around x) */
+                x += evt.motion.yrel * 0.1f;
+                y += evt.motion.xrel * 0.1f;
 
-                    Ogre::Matrix3 mat3;
-                    mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-                    mCamera->setOrientation(mat3);
-                }
+                Ogre::Matrix3 mat3;
+                mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+                mCamera->setOrientation(mat3);
             }
             break;
         case SDL_MOUSEWHEEL:

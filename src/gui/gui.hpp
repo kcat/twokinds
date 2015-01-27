@@ -33,22 +33,27 @@ class Gui : public GuiIface {
 
     Console *mConsole;
 
+    int mActiveModes;
+
 public:
     Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
     virtual ~Gui();
 
-    virtual void printToConsole(const std::string &str);
+    virtual void printToConsole(const std::string &str) final;
 
-    virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate);
+    virtual void addConsoleCallback(const char *command, CommandDelegateT *delegate) final;
 
-    virtual Mode getMode() const;
+    virtual void pushMode(Mode mode) final;
+    virtual void popMode(Mode mode) final;
+    virtual bool testMode(Mode mode) final { return !!(mActiveModes&mode); }
+    virtual Mode getMode() const final;
 
-    virtual void mouseMoved(int x, int y, int z);
-    virtual void mousePressed(int x, int y, int button);
-    virtual void mouseReleased(int x, int y, int button);
-    virtual void injectKeyPress(SDL_Keycode code);
-    virtual void injectKeyRelease(SDL_Keycode code);
-    virtual void injectTextInput(const char *text);
+    virtual void mouseMoved(int x, int y, int z) final;
+    virtual void mousePressed(int x, int y, int button) final;
+    virtual void mouseReleased(int x, int y, int button) final;
+    virtual void injectKeyPress(SDL_Keycode code) final;
+    virtual void injectKeyRelease(SDL_Keycode code) final;
+    virtual void injectTextInput(const char *text) final;
 
     void updateStatus(const std::string &str);
 };

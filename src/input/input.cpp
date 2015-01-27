@@ -4,6 +4,7 @@
 #include <SDL.h>
 
 #include "gui/iface.hpp"
+#include "log.hpp"
 
 namespace TK
 {
@@ -17,10 +18,14 @@ Input::Input()
   , mMouseY(0)
   , mMouseZ(0)
 {
+    int ret = SDL_SetRelativeMouseMode(SDL_TRUE);
+    if(ret != 0)
+        Log::get().stream()<< "SDL_SetRelativeMouseMode returned "<<ret<<", "<<SDL_GetError();
 }
 
 Input::~Input()
 {
+    SDL_SetRelativeMouseMode(SDL_FALSE);
 }
 
 
@@ -49,8 +54,25 @@ void Input::handleKeyboardEvent(const SDL_KeyboardEvent &evt)
 {
     if(evt.state == SDL_PRESSED)
     {
-        if(!evt.repeat)
-            GuiIface::get().injectKeyPress(evt.keysym.sym);
+        if(evt.repeat)
+            return;
+
+        GuiIface::get().injectKeyPress(evt.keysym.sym);
+        if(evt.keysym.sym == SDLK_BACKQUOTE)
+        {
+            if(!GuiIface::get().testMode(GuiIface::Mode_Console))
+            {
+                GuiIface::get().pushMode(GuiIface::Mode_Console);
+                if(SDL_GetRelativeMouseMode())
+                    SDL_SetRelativeMouseMode(SDL_FALSE);
+            }
+            else
+            {
+                GuiIface::get().popMode(GuiIface::Mode_Console);
+                if(GuiIface::get().getMode() == GuiIface::Mode_Game)
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+        }
     }
     else if(evt.state == SDL_RELEASED)
         GuiIface::get().injectKeyRelease(evt.keysym.sym);

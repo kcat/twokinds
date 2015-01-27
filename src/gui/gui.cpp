@@ -409,6 +409,11 @@ public:
 
 
 Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
+  : mPlatform(nullptr)
+  , mGui(nullptr)
+  , mStatusMessages(nullptr)
+  , mConsole(nullptr)
+  , mActiveModes(0)
 {
     try {
         mPlatform = new MyGUI::OgrePlatform();
@@ -471,11 +476,44 @@ void Gui::addConsoleCallback(const char *command, CommandDelegateT *delegate)
 }
 
 
-Gui::Mode Gui::getMode() const
+void Gui::pushMode(GuiIface::Mode mode)
 {
-    if(mConsole->getActive())
-        return Mode_Console;
-    return Mode_Game;
+    // If the mode is already set, early-out
+    if((mActiveModes&mode))
+        return;
+    switch(mode)
+    {
+        case Mode_Console:
+            mConsole->setActive(true);
+            break;
+        case Mode_Game:
+            break;
+    }
+    mActiveModes |= mode;
+}
+
+void Gui::popMode(GuiIface::Mode mode)
+{
+    // If the mode is not set, early-out
+    if(!(mActiveModes&mode))
+        return;
+    switch(mode)
+    {
+        case Mode_Console:
+            mConsole->setActive(false);
+            break;
+        case Mode_Game:
+            break;
+    }
+    mActiveModes &= ~mode;
+}
+
+GuiIface::Mode Gui::getMode() const
+{
+    unsigned int mode = Mode_Highest;
+    while(mode && !(mActiveModes&mode))
+        mode >>= 1;
+    return (GuiIface::Mode)mode;
 }
 
 
@@ -540,11 +578,7 @@ void Gui::injectKeyPress(SDL_Keycode code)
 {
     auto key = SDLtoMyGUIKeycode.find(code);
     if(key != SDLtoMyGUIKeycode.end())
-    {
-        if(code == SDLK_BACKQUOTE)
-            mConsole->setActive(!mConsole->getActive());
         MyGUI::InputManager::getInstance().injectKeyPress(key->second, 0);
-    }
     else
         Log::get().stream(Log::Level_Error)<< "Unexpected SDL keycode: "<<code;
 }
