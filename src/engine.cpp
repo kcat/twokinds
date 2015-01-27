@@ -313,6 +313,7 @@ bool Engine::pumpEvents()
                 /* Rotation (x motion rotates around y, y motion rotates around x) */
                 x += evt.motion.yrel * 0.1f;
                 y += evt.motion.xrel * 0.1f;
+                x = Ogre::Math::Clamp(x, -89.0f, 89.0f);
 
                 Ogre::Matrix3 mat3;
                 mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
