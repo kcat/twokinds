@@ -55,6 +55,7 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     bool pumpEvents();
 
     void quitCmd(const std::string &value);
+    void toggleBoundingBoxCmd(const std::string &value);
     void toggleDebugDisplayCmd(const std::string &value);
     void saveCfgCmd(const std::string &value);
     void internalCommand(const std::string &key, const std::string &value);

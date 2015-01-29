@@ -130,6 +130,7 @@ Engine::Engine(void)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
       { "savecfg", &Engine::saveCfgCmd },
+      { "tbb", &Engine::toggleBoundingBoxCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
       { "qqq", &Engine::quitCmd },
     }
@@ -350,6 +351,11 @@ void Engine::quitCmd(const std::string&)
     SDL_Event evt{};
     evt.quit.type = SDL_QUIT;
     SDL_PushEvent(&evt);
+}
+
+void Engine::toggleBoundingBoxCmd(const std::string&)
+{
+    mSceneMgr->showBoundingBoxes(!mSceneMgr->getShowBoundingBoxes());
 }
 
 void Engine::toggleDebugDisplayCmd(const std::string&)
