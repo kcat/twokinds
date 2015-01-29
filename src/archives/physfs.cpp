@@ -274,7 +274,6 @@ void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
 
 void PhysFSFactory::addPath(const char *path, const char *mountPoint, bool append) const
 {
-    Log::get().stream()<< "Adding "<<path<<" to "<<(mountPoint?mountPoint:"<root>")<<"...";
     if(PHYSFS_mount(path, mountPoint, append) == 0)
         Log::get().stream(Log::Level_Error)<< "Failed to add "<<path<<": "<<PHYSFS_getLastError();
 }

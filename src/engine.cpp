@@ -390,6 +390,7 @@ void Engine::internalCommand(const std::string &key, const std::string &value)
 
 bool Engine::go(void)
 {
+    Log::get().message("Initializing SDL...");
     // Kindly ask SDL not to trash our OGL context
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
@@ -402,6 +403,7 @@ bool Engine::go(void)
     }
 
     // Construct Ogre::Root
+    Log::get().message("Initializing Ogre Root...");
     mRoot = new Ogre::Root("plugins.cfg", Ogre::String(), Ogre::String());
 
     Ogre::ArchiveManager::getSingleton().addArchiveFactory(new PhysFSFactory);
@@ -419,6 +421,7 @@ bool Engine::go(void)
                 Ogre::ConfigFile::SettingsMultiMap *settings = seci.getNext();
                 if(secName == "CVars")
                 {
+                    Log::get().message("Loading cvar values...");
                     for(const auto &i : *settings)
                         CVar::setByName(i.first, i.second);
                 }
@@ -428,11 +431,12 @@ bool Engine::go(void)
             // Ignore if config file not found
         }
 
+        Log::get().message("Setting up RenderSystem...");
         Ogre::RenderSystem *rsys = nullptr;
         if(!r_rendersystem->empty())
         {
             if(!(rsys=mRoot->getRenderSystemByName(*r_rendersystem)))
-                Log::get().stream()<< "Render system \""<<*r_rendersystem<<"\" not found";
+                Log::get().stream(Log::Level_Error)<< "  Render system \""<<*r_rendersystem<<"\" not found";
         }
         if(!rsys)
         {
@@ -440,17 +444,18 @@ bool Engine::go(void)
             for(Ogre::RenderSystem *renderer : renderers)
             {
                 if(!rsys) rsys = renderer;
-                Log::get().stream()<< "Found renderer \""<<renderer->getName()<<"\"";
+                Log::get().stream()<< "  Found renderer \""<<renderer->getName()<<"\"";
             }
+            if(!rsys)
+                throw std::runtime_error("Failed to find a usable RenderSystem");
         }
-        if(!rsys)
-            throw std::runtime_error("Failed to find a usable RenderSystem");
         // Force the fixed-function pipeline off
         rsys->setConfigOption("Fixed Pipeline Enabled", "No");
         const Ogre::String &err = rsys->validateConfigOptions();
         if(!err.empty())
             throw std::runtime_error("RenderSystem config error: "+err);
         mRoot->setRenderSystem(rsys);
+        Log::get().stream()<< "  Initialized "<<rsys->getName();
 
 
         int width = *vid_width;
@@ -461,6 +466,7 @@ bool Engine::go(void)
         if(*vid_fullscreen)
             flags |= SDL_WINDOW_FULLSCREEN;
 
+        Log::get().stream()<< "Creating window "<<width<<"x"<<height<<", flags 0x"<<std::hex<<flags;
         mSDLWindow = SDL_CreateWindow("Twokinds", xpos, ypos, width, height, flags);
         if(mSDLWindow == nullptr)
         {
@@ -475,6 +481,7 @@ bool Engine::go(void)
     SDL_ShowCursor(0);
 
     // Setup resources
+    Log::get().message("Initializing resources...");
     {
         auto &resGrpMgr = Ogre::ResourceGroupManager::getSingleton();
         resGrpMgr.createResourceGroup("Shaders");
@@ -490,7 +497,10 @@ bool Engine::go(void)
 
         Ogre::StringVector paths = cf.getMultiSetting("source", "General");
         for(const auto &path : paths)
+        {
+            Log::get().stream()<< "  Adding source path "<<path;
             PhysFSFactory::getSingleton().addPath(path.c_str());
+        }
 
         // Go through all sections & settings in the file
         Ogre::ConfigFile::SectionIterator seci = cf.getSectionIterator();
@@ -560,9 +570,11 @@ bool Engine::go(void)
 #endif
 
     // Setup Input subsystem
+    Log::get().message("Initializing input...");
     mInput = new Input();
 
     // Setup GUI subsystem
+    Log::get().message("Initializing GUI...");
     mGui = new Gui(mWindow, mSceneMgr);
     Log::get().setGuiIface(mGui);
     for(const auto &cmd : mCommandFuncs)
