@@ -39,7 +39,7 @@ public:
      *
      * \return false if the given \param mode is not enabled.
      */
-    virtual bool testMode(Mode mode) = 0;
+    virtual bool testMode(Mode mode) const = 0;
     /** \return The current top-level GUI mode. */
     virtual Mode getMode() const = 0;
 

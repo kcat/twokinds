@@ -45,7 +45,7 @@ public:
 
     virtual void pushMode(Mode mode) final;
     virtual void popMode(Mode mode) final;
-    virtual bool testMode(Mode mode) final { return !!(mActiveModes&mode); }
+    virtual bool testMode(Mode mode) const final { return !!(mActiveModes&mode); }
     virtual Mode getMode() const final;
 
     virtual void mouseMoved(int x, int y, int z) final;
