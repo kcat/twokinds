@@ -114,8 +114,8 @@ public:
 
 
 /* World size/height is just a placeholder for now. */
-#define TERRAIN_WORLD_SIZE 1500.0f
-#define TERRAIN_WORLD_HEIGHT 600.0f
+#define TERRAIN_WORLD_SIZE 2048.0f
+#define TERRAIN_WORLD_HEIGHT 2400.0f
 #define TERRAIN_SIZE 65
 
 class TerrainStorage : public Terrain::Storage
@@ -126,8 +126,9 @@ class TerrainStorage : public Terrain::Storage
     noise::module::ScaleBias mFieldsTerrain;
     noise::module::Billow mBaseSeaTerrain;
     noise::module::ScaleBias mSeaTerrain;
+    noise::module::Select mCombinedTerrain;
 
-    noise::module::Select mFinalTerrain;
+    noise::module::Add mFinalTerrain;
 
 public:
     TerrainStorage();
@@ -167,20 +168,21 @@ TerrainStorage::TerrainStorage()
     float fields_base = 16.0f/255.0f * 2.0f - 1.0f;
     mBaseFieldsTerrain.SetFrequency(noise::module::DEFAULT_PERLIN_FREQUENCY * 2.0);
     mFieldsTerrain.SetSourceModule(0, mBaseFieldsTerrain);
-    mFieldsTerrain.SetScale(0.25);
-    mFieldsTerrain.SetBias(0.25 + fields_base);
+    mFieldsTerrain.SetScale(1.0 / 32.0);
 
     mBaseSeaTerrain.SetFrequency(2.0 * 2.0);
     mSeaTerrain.SetSourceModule(0, mBaseSeaTerrain);
-    mSeaTerrain.SetScale(0.0625);
-    mSeaTerrain.SetBias(-1.5);
+    mSeaTerrain.SetScale(1.0 / 64.0);
 
     float edge_falloff = 8.0f/255.0f;
-    mFinalTerrain.SetSourceModule(0, mSeaTerrain);
-    mFinalTerrain.SetSourceModule(1, mFieldsTerrain);
-    mFinalTerrain.SetControlModule(mHeightmapModule);
-    mFinalTerrain.SetBounds(fields_base-edge_falloff, std::numeric_limits<double>::max());
-    mFinalTerrain.SetEdgeFalloff(edge_falloff);
+    mCombinedTerrain.SetSourceModule(0, mSeaTerrain);
+    mCombinedTerrain.SetSourceModule(1, mFieldsTerrain);
+    mCombinedTerrain.SetControlModule(mHeightmapModule);
+    mCombinedTerrain.SetBounds(fields_base-edge_falloff, std::numeric_limits<double>::max());
+    mCombinedTerrain.SetEdgeFalloff(edge_falloff);
+
+    mFinalTerrain.SetSourceModule(0, mCombinedTerrain);
+    mFinalTerrain.SetSourceModule(1, mHeightmapModule);
 }
 
 void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& maxY)
@@ -193,8 +195,8 @@ void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& max
 
 bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
 {
-    min = -TERRAIN_WORLD_HEIGHT;
-    max =  TERRAIN_WORLD_HEIGHT;
+    min = -TERRAIN_WORLD_HEIGHT*2.0f;
+    max =  TERRAIN_WORLD_HEIGHT*2.0f;
     return true;
 }
 
@@ -219,8 +221,7 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
 
     noise::utils::Image normalmap(output.GetWidth(), output.GetHeight());
     noise::utils::RendererNormalMap normrender;
-    /* *0.5f since libnoise goes from -1..+1, rather than 0..1 */
-    normrender.SetBumpHeight(TERRAIN_WORLD_HEIGHT*0.5f / (TERRAIN_WORLD_SIZE / (TERRAIN_SIZE-1)) / size);
+    normrender.SetBumpHeight(TERRAIN_WORLD_HEIGHT / (TERRAIN_WORLD_SIZE / (TERRAIN_SIZE-1)) / size);
     normrender.SetSourceNoiseMap(output);
     normrender.SetDestImage(normalmap);
     normrender.Render();
@@ -239,7 +240,7 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
 
             positions[idx*3 + 0] = (px/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
             positions[idx*3 + 1] = (py/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
-            positions[idx*3 + 2] = (src[px]*0.5f + 0.5f) * TERRAIN_WORLD_HEIGHT;
+            positions[idx*3 + 2] = src[px] * TERRAIN_WORLD_HEIGHT;
             Terrain::convertPosition(align, positions[idx*3 + 0], positions[idx*3 + 1], positions[idx*3 + 2]);
 
             normals[idx*3 + 0] = norms[px].red/127.5f - 1.0f;
@@ -284,7 +285,7 @@ void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nod
 float TerrainStorage::getHeightAt(const Ogre::Vector3 &worldPos)
 {
     float val = mFinalTerrain.GetValue(worldPos.x / TERRAIN_WORLD_SIZE, 0.0f, worldPos.z / -TERRAIN_WORLD_SIZE);
-    return (val*0.5f + 0.5f) * TERRAIN_WORLD_HEIGHT;
+    return val * TERRAIN_WORLD_HEIGHT;
 }
 
 
