@@ -33,6 +33,7 @@
 #include "gui/gui.hpp"
 #include "terrain.hpp"
 #include "delegates.hpp"
+#include "sparsearray.hpp"
 #include "cvars.hpp"
 #include "log.hpp"
 
