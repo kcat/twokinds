@@ -43,6 +43,59 @@ class SparseArray {
     SparseArray(const SparseArray<value_type>&) = delete;
     SparseArray<T>& operator=(const SparseArray<value_type>&) = delete;
 
+    template<typename _PT, typename _LT, typename _IT>
+    class iterator_base : public std::iterator<std::bidirectional_iterator_tag, _PT> {
+        typedef iterator_base<_PT,_LT,_IT> self_type;
+
+        _LT mContainer;
+        _IT mIter;
+
+    public:
+        iterator_base() { }
+        iterator_base(_LT *cont, _IT&& iter)
+          : mContainer(cont), mIter(std::move(iter))
+        {
+            while(mIter != mContainer->end() && mIter->first == std::numeric_limits<size_t>::max())
+                ++mIter;
+        }
+
+        bool operator==(const self_type &rhs) const
+        { return mIter == rhs.mIter; }
+        bool operator!=(const self_type &rhs) const
+        { return mIter != rhs.mIter; }
+
+        _PT& operator*() { return *mIter; }
+        _PT* operator->() { return &*mIter; }
+
+        self_type& operator++()
+        {
+            do {
+                ++mIter;
+            } while(mIter != mContainer->end() && mIter->first == std::numeric_limits<size_t>::max());
+            return *this;
+        }
+        self_type& operator--()
+        {
+            do {
+                --mIter;
+            } while(mIter != mContainer->rend() && mIter->first == std::numeric_limits<size_t>::max());
+            return *this;
+        }
+
+        self_type operator++(int)
+        {
+            self_type old = *this;
+            ++*this;
+            return old;
+        }
+        self_type operator--(int)
+        {
+            self_type old = *this;
+            --*this;
+            return old;
+        }
+    };
+
 public:
     // NOTE: SparseArray iterators operate sequentially over the deque, rather
     // than the user index map. This means it's possible for index n to be
@@ -50,86 +103,11 @@ public:
     // since following the user index ordering could cause data lookups to jump
     // forward and backward within the deque.
     //
-    // The iterator acts as a pair, with first=index, second=element
-    class iterator {
-        typedef typename list_type::iterator iter_type;
-
-        list_type *mContainer;
-        iter_type mIter;
-
-    public:
-        iterator() { }
-        iterator(list_type *cont, iter_type&& iter)
-          : mContainer(cont), mIter(std::move(iter))
-        {
-            while(mIter != mContainer->end() && mIter->first == std::numeric_limits<size_t>::max())
-                ++mIter;
-        }
-
-        bool operator==(const iterator &rhs) const
-        { return mIter == rhs.mIter; }
-        bool operator!=(const iterator &rhs) const
-        { return mIter != rhs.mIter; }
-
-        pair_type& operator*() { return *mIter; }
-        pair_type* operator->() { return &*mIter; }
-
-        iterator& operator++()
-        {
-            do {
-                ++mIter;
-            } while(mIter != mContainer->end() && mIter->first == std::numeric_limits<size_t>::max());
-            return *this;
-        }
-        iterator operator++(int)
-        {
-            iterator old = *this;
-            do {
-                ++mIter;
-            } while(mIter != mContainer->end() && mIter->first == std::numeric_limits<size_t>::max());
-            return old;
-        }
-    };
-    class const_iterator {
-        typedef typename list_type::const_iterator iter_type;
-
-        const list_type *mContainer;
-        iter_type mIter;
-
-    public:
-        const_iterator() { }
-        const_iterator(const list_type *cont, iter_type&& iter)
-          : mContainer(cont), mIter(std::move(iter))
-        {
-            while(mIter != mContainer->cend() && mIter->first == std::numeric_limits<size_t>::max())
-                ++mIter;
-        }
-
-        bool operator==(const const_iterator &rhs) const
-        { return mIter == rhs.mIter; }
-        bool operator!=(const const_iterator &rhs) const
-        { return mIter != rhs.mIter; }
-
-        const pair_type& operator*() { return *mIter; }
-        const pair_type* operator->() { return &*mIter; }
-
-        const_iterator& operator++()
-        {
-            do {
-                ++mIter;
-            } while(mIter != mContainer->cend() && mIter->first == std::numeric_limits<size_t>::max());
-            return *this;
-        }
-        const_iterator operator++(int)
-        {
-            const_iterator old = *this;
-            do {
-                ++mIter;
-            } while(mIter != mContainer->cend() && mIter->first == std::numeric_limits<size_t>::max());
-            return old;
-        }
-    };
-
+    // The iterator references a pair, with first=index, second=element
+    typedef iterator_base<pair_type,list_type*,typename list_type::iterator> iterator;
+    typedef iterator_base<const pair_type,const list_type*,typename list_type::const_iterator> const_iterator;
+    typedef std::reverse_iterator<iterator> reverse_iterator;
+    typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
     SparseArray() { }
     ~SparseArray()
@@ -193,11 +171,19 @@ public:
 
     iterator begin() { return iterator(&mData, mData.begin()); }
     iterator end() { return iterator(&mData, mData.end()); }
-
     const_iterator begin() const { return const_iterator(&mData, mData.begin()); }
     const_iterator end() const { return const_iterator(&mData, mData.end()); }
+
     const_iterator cbegin() const { return const_iterator(&mData, mData.cbegin()); }
     const_iterator cend() const { return const_iterator(&mData, mData.cend()); }
+
+    reverse_iterator rbegin() { return reverse_iterator(&mData, mData.rbegin()); }
+    reverse_iterator rend() { return reverse_iterator(&mData, mData.rend()); }
+    const_reverse_iterator rbegin() const { return  const_reverse_iterator(&mData, mData.rbegin()); }
+    const_reverse_iterator rend() const { return const_reverse_iterator(&mData, mData.rend()); }
+
+    const_reverse_iterator crbegin() const { return const_reverse_iterator(&mData, mData.crbegin()); }
+    const_reverse_iterator crend() const { return const_reverse_iterator(&mData, mData.crend()); }
 };
 
 } // namespace TK
