@@ -417,6 +417,16 @@ Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
 {
     try {
         mPlatform = new MyGUI::OgrePlatform();
+        switch(Ogre::LogManager::getSingleton().getDefaultLog()->getLogDetail())
+        {
+            case Ogre::LL_BOREME:
+            case Ogre::LL_NORMAL:
+                MyGUI::LogManager::getInstance().setLoggingLevel(MyGUI::LogLevel::Info);
+                break;
+            case Ogre::LL_LOW:
+                MyGUI::LogManager::getInstance().setLoggingLevel(MyGUI::LogLevel::Warning);
+                break;
+        }
         mPlatform->initialise(window, sceneMgr, "GUI");
         try {
             mGui = new MyGUI::Gui();

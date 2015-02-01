@@ -1,13 +1,18 @@
 #ifndef LOG_HPP
 #define LOG_HPP
 
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <OgreLog.h>
-
 #include "singleton.hpp"
+
+
+namespace Ogre
+{
+    class Log;
+}
 
 
 namespace TK
@@ -26,17 +31,22 @@ public:
     };
 
 private:
+    class OgreListener;
+
     Level mLevel;
-    Ogre::Log *mLog;
     GuiIface *mGui;
     std::vector<std::string> mBuffer;
+    std::ofstream mOutfile;
+    Ogre::Log *mLog;
+    OgreListener *mOgreListener;
+
+    static std::string getTimestamp();
 
 public:
-    Log(Level level=Level_Normal, Ogre::Log *log=nullptr)
-      : mLevel(level), mLog(log), mGui(nullptr)
-    { }
+    Log(Level level=Level_Normal, Ogre::Log *log=nullptr);
+    virtual ~Log();
 
-    void setLog(Ogre::Log *log) { mLog = log; }
+    void setLog(Ogre::Log *log);
     void setLevel(Level level) { mLevel = level; }
 
     void setGuiIface(GuiIface *iface);

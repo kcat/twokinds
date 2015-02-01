@@ -137,10 +137,10 @@ Engine::Engine(void)
     }
 {
     Ogre::LogManager *logMgr = OGRE_NEW Ogre::LogManager();
-    logMgr->createLog("twokinds.log", true);
+    logMgr->createLog("twokinds.log", true, false, true);
+    logMgr->setLogDetail(Ogre::LL_LOW);
 
     new Log(Log::Level_Normal, logMgr->getDefaultLog());
-    Log::get().message("--- Starting log ---");
 }
 
 Engine::~Engine(void)
