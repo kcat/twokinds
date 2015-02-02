@@ -2,14 +2,15 @@
 #define ARCHIVES_PHYSFS_HPP
 
 #include <OgreArchiveFactory.h>
-#include <OgreSingleton.h>
+
+#include "singleton.hpp"
 
 namespace TK
 {
 
 // An archive factory for PhysFS. Only one archive is made here, and it has
 // access to the whole PhysFS file hierarchy.
-class PhysFSFactory : public Ogre::ArchiveFactory, public Ogre::Singleton<PhysFSFactory>
+class PhysFSFactory : public Ogre::ArchiveFactory, public Singleton<PhysFSFactory>
 {
 public:
     PhysFSFactory();

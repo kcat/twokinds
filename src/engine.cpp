@@ -197,7 +197,6 @@ Engine::~Engine(void)
     delete Log::getPtr();
 }
 
-
 bool Engine::parseOptions(int argc, char *argv[])
 {
     for(int i = 1;i < argc;i++)
@@ -500,7 +499,7 @@ bool Engine::go(void)
         for(const auto &path : paths)
         {
             Log::get().stream()<< "  Adding source path "<<path;
-            PhysFSFactory::getSingleton().addPath(path.c_str());
+            PhysFSFactory::get().addPath(path.c_str());
         }
 
         // Go through all sections & settings in the file
@@ -514,12 +513,12 @@ bool Engine::go(void)
                 if(i.first != "path")
                     continue;
                 resGrpMgr.addResourceLocation(
-                    i.second, PhysFSFactory::getSingleton().getType(),
+                    i.second, PhysFSFactory::get().getType(),
                     secName, true
                 );
             }
         }
-        resGrpMgr.addResourceLocation("", PhysFSFactory::getSingleton().getType());
+        resGrpMgr.addResourceLocation("", PhysFSFactory::get().getType());
     }
 
     /* Necessary for D3D11/GL3+. They have no fixed function pipeline. Must be

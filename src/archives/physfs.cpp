@@ -235,7 +235,7 @@ namespace TK
 {
 
 template<>
-PhysFSFactory* Ogre::Singleton<PhysFSFactory>::msSingleton = nullptr;
+PhysFSFactory* Singleton<PhysFSFactory>::sInstance = nullptr;
 
 PhysFSFactory::PhysFSFactory()
 {
