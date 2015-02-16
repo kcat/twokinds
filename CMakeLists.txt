@@ -43,6 +43,7 @@ endif()
 set(CMAKE_DEBUG_POSTFIX "_d")
 
 find_package(OGRE REQUIRED)
+find_package(OpenSceneGraph REQUIRED osgDB osgViewer)
 find_package(SDL2 REQUIRED)
 find_package(MyGUI REQUIRED)
 find_package(PhysFS REQUIRED)
@@ -140,6 +141,7 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
     "${twokinds_SOURCE_DIR}/src"
     ${OGRE_INCLUDE_DIRS}
     ${OGRE_RTShaderSystem_INCLUDE_DIRS}
+    ${OPENSCENEGRAPH_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIR}
     ${MYGUI_INCLUDE_DIRS}
     ${PHYSFS_INCLUDE_DIR}
@@ -148,6 +150,7 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
 target_link_libraries(twokinds
     ${OGRE_LIBRARIES}
     ${OGRE_RTShaderSystem_LIBRARIES}
+    ${OPENSCENEGRAPH_LIBRARIES}
     ${SDL2_LIBRARY}
     ${MYGUI_PLATFORM_LIBRARIES}
     ${MYGUI_LIBRARIES}
