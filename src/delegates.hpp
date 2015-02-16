@@ -147,8 +147,6 @@ class CMultiDelegate
 {
     typedef IDelegate<Args...> DelegateT;
     typedef typename std::list<DelegateT* /*, Allocator<DelegateT*>*/ > ListDelegate;
-    typedef typename ListDelegate::iterator ListDelegateIterator;
-    typedef typename ListDelegate::const_iterator ConstListDelegateIterator;
 
     // No copying (only moving)
     CMultiDelegate(const CMultiDelegate<Args...>& _event) = delete;
@@ -156,12 +154,12 @@ class CMultiDelegate
 
     void safe_clear(ListDelegate& _delegates)
     {
-        for(ListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto &_deleg : mListDelegates)
         {
-            if(*iter)
+            if(_deleg)
             {
-                DelegateT *del = *iter;
-                *iter = nullptr;
+                DelegateT *del = *_deleg;
+                _deleg = nullptr;
                 delete_if_not_found(del, _delegates);
             }
         }
@@ -169,9 +167,9 @@ class CMultiDelegate
 
     static void delete_if_not_found(DelegateT *_del, ListDelegate &_delegates)
     {
-        for(ListDelegateIterator iter = _delegates.begin();iter != _delegates.end();++iter)
+        for(auto _deleg : _delegates)
         {
-            if(*iter && (*iter)->compare(_del))
+            if(_deleg && _deleg->compare(_del))
                 return;
         }
         delete _del;
@@ -195,9 +193,9 @@ public:
 
     bool empty() const
     {
-        for(ConstListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto _deleg : mListDelegates)
         {
-            if(*iter)
+            if(_deleg)
                 return false;
         }
         return true;
@@ -205,30 +203,30 @@ public:
 
     void clear()
     {
-        for(ListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto &_deleg : mListDelegates)
         {
-            delete *iter;
-            *iter = nullptr;
+            delete _deleg;
+            _deleg = nullptr;
         }
     }
 
     void clear(MyGUI::delegates::IDelegateUnlink *_unlink)
     {
-        for(ListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto &_deleg : mListDelegates)
         {
-            if(*iter && (*iter)->compare(_unlink))
+            if(_deleg && _deleg->compare(_unlink))
             {
-                delete *iter;
-                *iter = nullptr;
+                delete _deleg;
+                _deleg = nullptr;
             }
         }
     }
 
     CMultiDelegate<Args...>& operator+=(DelegateT *_delegate)
     {
-        for(ListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto _deleg : mListDelegates)
         {
-            if(*iter && (*iter)->compare(_delegate))
+            if(_deleg && _deleg->compare(_delegate))
                 MYGUI_EXCEPT("Trying to add same delegate twice.");
         }
         mListDelegates.push_back(_delegate);
@@ -237,14 +235,14 @@ public:
 
     CMultiDelegate<Args...>& operator-=(DelegateT *_delegate)
     {
-        for(ListDelegateIterator iter = mListDelegates.begin();iter != mListDelegates.end();++iter)
+        for(auto &_deleg : mListDelegates)
         {
-            if(*iter && (*iter)->compare(_delegate))
+            if(_deleg && _deleg->compare(_delegate))
             {
                 // проверяем на идентичность делегатов
-                if(*iter != _delegate)
-                    delete *iter;
-                *iter = nullptr;
+                if(_deleg != _delegate)
+                    delete _deleg;
+                _deleg = nullptr;
                 break;
             }
         }
@@ -254,7 +252,7 @@ public:
 
     void operator()(Args...args)
     {
-        ListDelegateIterator iter = mListDelegates.begin();
+        auto iter = mListDelegates.begin();
         while(iter != mListDelegates.end())
         {
             if(nullptr == *iter)
