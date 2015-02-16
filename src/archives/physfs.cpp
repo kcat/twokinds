@@ -363,6 +363,8 @@ namespace TK
 //! OSG Reader for physfs
 class ReaderPhysFS : public osgDB::ReaderWriter, public Singleton<ReaderPhysFS>
 {
+    static thread_local bool sAcceptExtensions;
+
     static bool open(PhysFSStream &istream, const std::string &fname, const Options *options)
     {
         // try to find the proper path in vfs
@@ -387,46 +389,32 @@ public:
 
     virtual bool acceptsExtension(const std::string &ext) const
     {
-        /* HACK: Report no extensions as accepted. This will cause calls to
-         * getReaderWriterForExtension to skip us and return the actual
-         * ReaderWriter to handle a given resource. Luckilly this does not seem
-         * to effect calls to osgDB::read*File. */
-        return false;
+        /* HACK: If we're recursing, we won't accept any extensions so we can
+         * get the appropriate ReaderWriter format handler. */
+        return sAcceptExtensions;
     }
 
-    virtual ReadResult readObject(const std::string &fname, const Options *options) const
-    {
-        PhysFSStream istream;
-        if(!open(istream, fname, options))
-            return ReadResult::FILE_NOT_FOUND;
-
-        const osgDB::ReaderWriter *rw = osgDB::Registry::instance()->getReaderWriterForExtension(osgDB::getFileExtension(fname));
-        if(rw) return rw->readObject(istream, options);
-        return ReadResult::ERROR_IN_READING_FILE;
+#define WRAP_READER(func)                                                           \
+    virtual ReadResult func(const std::string &fname, const Options *options) const \
+    {                                                                               \
+        PhysFSStream istream;                                                       \
+        if(!open(istream, fname, options))                                          \
+            return ReadResult::FILE_NOT_FOUND;                                      \
+                                                                                    \
+        sAcceptExtensions = false;                                                  \
+        const osgDB::ReaderWriter *rw = osgDB::Registry::instance()->getReaderWriterForExtension(osgDB::getFileExtension(fname)); \
+        sAcceptExtensions = true;                                                   \
+        if(rw) return rw->func(istream, options);                                   \
+        return ReadResult::ERROR_IN_READING_FILE;                                   \
     }
-
-    virtual ReadResult readImage(const std::string &fname, const Options *options) const
-    {
-        PhysFSStream istream;
-        if(!open(istream, fname, options))
-            return ReadResult::FILE_NOT_FOUND;
-
-        const osgDB::ReaderWriter *rw = osgDB::Registry::instance()->getReaderWriterForExtension(osgDB::getFileExtension(fname));
-        if(rw) return rw->readImage(istream, options);
-        return ReadResult::ERROR_IN_READING_FILE;
-    }
-
-    virtual ReadResult readNode(const std::string &fname, const Options *options) const
-    {
-        PhysFSStream istream;
-        if(!open(istream, fname, options))
-            return ReadResult::FILE_NOT_FOUND;
-
-        const osgDB::ReaderWriter *rw = osgDB::Registry::instance()->getReaderWriterForExtension(osgDB::getFileExtension(fname));
-        if(rw) return rw->readNode(istream, options);
-        return ReadResult::ERROR_IN_READING_FILE;
-    }
+    WRAP_READER(readObject)
+    WRAP_READER(readImage)
+    WRAP_READER(readHeightField)
+    WRAP_READER(readNode)
+    WRAP_READER(readShader)
+#undef WRAP_READER
 };
+thread_local bool ReaderPhysFS::sAcceptExtensions = true;
 template<>
 ReaderPhysFS* Singleton<ReaderPhysFS>::sInstance = nullptr;
 
