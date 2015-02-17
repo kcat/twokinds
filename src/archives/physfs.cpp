@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <sstream>
 
+#include <fnmatch.h>
+
 #include <OgreArchive.h>
 #include <OgreLogManager.h>
 
@@ -492,6 +494,22 @@ class PhysFSDataManager : public MyGUI::DataManager {
         return std::move(found);
     }
 
+    void enumerateFiles(MyGUI::VectorString &filelist, const std::string &pattern, const std::string &path=std::string()) const
+    {
+        char **list = PHYSFS_enumerateFiles((mBasePath+path).c_str());
+        for(size_t i = 0;list[i];i++)
+        {
+            std::string fullName = path+"/"+list[i];
+
+            if(fnmatch(pattern.c_str(), fullName.c_str(), 0) == 0)
+                filelist.push_back(fullName);
+
+            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
+                enumerateFiles(filelist, pattern, fullName);
+        }
+        PHYSFS_freeList(list);
+    }
+
 public:
     PhysFSDataManager(std::string&& basepath)
       : mBasePath(std::move(basepath))
@@ -530,8 +548,9 @@ public:
     virtual const MyGUI::VectorString &getDataListNames(const std::string &_pattern)
     {
         static MyGUI::VectorString name_list;
-        // FIXME: Need to match enumerated files to the given _pattern
+        MyGUI::VectorString().swap(name_list);
         std::cerr<< "Searching for "<<_pattern <<std::endl;
+        enumerateFiles(name_list, _pattern);
         return name_list;
     }
 
