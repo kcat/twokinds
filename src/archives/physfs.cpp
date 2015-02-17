@@ -12,6 +12,8 @@
 #include <osgDB/FileNameUtils>
 #include <osgDB/Registry>
 
+#include <MyGUI_DataManager.h>
+
 #include "physfs.h"
 
 #include "log.hpp"
@@ -147,6 +149,50 @@ public:
 };
 
 
+class PhysFSDataStream : public MyGUI::IDataStream {
+    PHYSFS_File *mFile;
+
+public:
+    PhysFSDataStream() : mFile(nullptr)
+    { }
+    virtual ~PhysFSDataStream()
+    {
+        PHYSFS_close(mFile);
+        mFile = nullptr;
+    }
+
+    bool open(const char *fname)
+    {
+        PHYSFS_File *file = PHYSFS_openRead(fname);
+        if(!file) return false;
+
+        PHYSFS_close(mFile);
+        mFile = file;
+
+        return true;
+    }
+
+    virtual bool eof() { return PHYSFS_eof(mFile); }
+
+    virtual size_t size() { return PHYSFS_fileLength(mFile); }
+
+    virtual void readline(std::string &_source, MyGUI::Char _delim)
+    {
+        std::string().swap(_source);
+
+        unsigned char val;
+        while(PHYSFS_read(mFile, &val, 1, 1) == 1 && val != _delim)
+            _source += (char)val;
+    }
+
+    virtual size_t read(void *_buf, size_t _count)
+    {
+        PHYSFS_sint64 ret = PHYSFS_read(mFile, _buf, 1, _count);
+        return std::max<PHYSFS_sint64>(0, ret);
+    }
+};
+
+
 class PhysFileStream : public Ogre::DataStream {
     PHYSFS_File *mFile;
 
@@ -206,7 +252,7 @@ public:
         if(pos == -1)
             throw std::runtime_error("PHYSFS_tell failed");
         return pos;
-     }
+    }
 
     virtual bool eof() const
     {
@@ -419,6 +465,91 @@ template<>
 ReaderPhysFS* Singleton<ReaderPhysFS>::sInstance = nullptr;
 
 
+class PhysFSDataManager : public MyGUI::DataManager {
+    std::string mBasePath;
+
+    std::string findFilePath(const std::string &fname, const std::string &path=std::string()) const
+    {
+        std::string found;
+
+        char **list = PHYSFS_enumerateFiles((mBasePath+path).c_str());
+        for(size_t i = 0;list[i];i++)
+        {
+            if(fname == list[i])
+            {
+                found = path+"/"+list[i];
+                break;
+            }
+        }
+        for(size_t i = 0;found.empty() && list[i];i++)
+        {
+            std::string fullName = path+"/"+list[i];
+            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
+                found = findFilePath(fname, fullName);
+        }
+        PHYSFS_freeList(list);
+
+        return std::move(found);
+    }
+
+public:
+    PhysFSDataManager(std::string&& basepath)
+      : mBasePath(std::move(basepath))
+    { }
+
+    /** Get data stream from specified resource name.
+     *  @param _name Resource name (usually file name).
+     */
+    virtual MyGUI::IDataStream *getData(const std::string &_name)
+    {
+        std::unique_ptr<PhysFSDataStream> istream(new PhysFSDataStream());
+        if(istream->open((mBasePath+_name).c_str()))
+            return istream.release();
+        return nullptr;
+    }
+
+    /** Free data stream.
+     *  @param _data Data stream.
+     */
+    virtual void freeData(MyGUI::IDataStream *_data)
+    {
+        delete _data;
+    }
+
+    /** Is data with specified name exist.
+     *  @param _name Resource name.
+     */
+    virtual bool isDataExist(const std::string &_name)
+    {
+        return PHYSFS_exists((mBasePath+_name).c_str()) != 0;
+    }
+
+    /** Get all data names with names that matches pattern.
+     *  @param _pattern Pattern to match (for example "*.layout").
+     */
+    virtual const MyGUI::VectorString &getDataListNames(const std::string &_pattern)
+    {
+        static MyGUI::VectorString name_list;
+        // FIXME: Need to match enumerated files to the given _pattern
+        std::cerr<< "Searching for "<<_pattern <<std::endl;
+        return name_list;
+    }
+
+    /** Get full path to data.
+     *  @param _name Resource name.
+     *  @return Return full path to specified data.
+     *  For example getDataPath("My.layout") might return "C:\path\to\project\data\My.layout"
+     */
+    virtual const std::string &getDataPath(const std::string &_name)
+    {
+        static std::string fullpath;
+        fullpath = findFilePath(_name);
+        std::cerr<< "Found "<<fullpath<<" for "<<_name <<std::endl;
+        return fullpath;
+    }
+};
+
+
 template<>
 PhysFSFactory* Singleton<PhysFSFactory>::sInstance = nullptr;
 
@@ -469,3 +600,8 @@ void PhysFSFactory::addPath(const char *path, const char *mountPoint, bool appen
 }
 
 } // namespace TK
+
+template<>
+MyGUI::DataManager* MyGUI::Singleton<MyGUI::DataManager>::msInstance = nullptr;
+template<>
+const char* MyGUI::Singleton<MyGUI::DataManager>::mClassTypeName = "PhysFSDataManager";
