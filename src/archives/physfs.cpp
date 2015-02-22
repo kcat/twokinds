@@ -3,11 +3,9 @@
 
 #include <stdexcept>
 #include <sstream>
+#include <memory>
 
 #include <fnmatch.h>
-
-#include <OgreArchive.h>
-#include <OgreLogManager.h>
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Options>
@@ -194,226 +192,16 @@ public:
     }
 };
 
-
-class PhysFileStream : public Ogre::DataStream {
-    PHYSFS_File *mFile;
-
-public:
-    PhysFileStream(PHYSFS_File *file) : mFile(file)
-    {
-        PHYSFS_sint64 len = PHYSFS_fileLength(mFile);
-        if(len > 0) mSize = len;
-    }
-    virtual ~PhysFileStream()
-    { close(); }
-
-    virtual size_t read(void *buf, size_t count)
-    {
-        PHYSFS_sint64 got = PHYSFS_read(mFile, buf, 1, count);
-        if(got >= 0) return got;
-        throw std::runtime_error("Failed to read from file");
-    }
-
-    virtual size_t write(const void *buf, size_t count)
-    {
-        PHYSFS_sint64 got = PHYSFS_write(mFile, buf, 1, count);
-        if(got >= 0) return got;
-        throw std::runtime_error("Failed to write to file");
-    }
-
-    virtual void skip(long count)
-    {
-        PHYSFS_sint64 pos = PHYSFS_tell(mFile);
-        if(pos < 0 || std::numeric_limits<PHYSFS_sint64>::max()-pos < count)
-        {
-            std::stringstream sstr;
-            sstr<< "Cannot skip "<<count<<" bytes";
-            throw std::runtime_error(sstr.str());
-        }
-        if(!PHYSFS_seek(mFile, pos + count))
-        {
-            std::stringstream sstr;
-            sstr<< "Failed to skip "<<count<<" bytes";
-            throw std::runtime_error(sstr.str());
-        }
-    }
-
-    virtual void seek(size_t pos)
-    {
-        if(!PHYSFS_seek(mFile, pos))
-        {
-            std::stringstream sstr;
-            sstr<< "Failed to seek to offset "<<pos;
-            throw std::runtime_error(sstr.str());
-        }
-    }
-
-    virtual size_t tell() const
-    {
-        PHYSFS_sint64 pos = PHYSFS_tell(mFile);
-        if(pos == -1)
-            throw std::runtime_error("PHYSFS_tell failed");
-        return pos;
-    }
-
-    virtual bool eof() const
-    {
-        return PHYSFS_eof(mFile);
-    }
-
-    virtual void close()
-    {
-        if(mFile)
-            PHYSFS_close(mFile);
-        mFile = nullptr;
-    }
-};
-typedef Ogre::SharedPtr<PhysFileStream> PhysFileStreamPtr;
-
-
-class PhysFSArchive : public Ogre::Archive {
-    const Ogre::String mBasePath;
-
-    void enumerateNames(const Ogre::String &dirpath, Ogre::StringVectorPtr &names, const Ogre::String &pattern, bool recurse, bool dirs) const
-    {
-        char **list = PHYSFS_enumerateFiles((mBasePath+dirpath).c_str());
-        for(size_t i = 0;list[i];i++)
-        {
-            std::string fullName = dirpath+list[i];
-            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
-            {
-                if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
-                    names->push_back(fullName);
-                if(recurse)
-                {
-                    fullName += "/";
-                    enumerateNames(fullName, names, pattern, recurse, dirs);
-                }
-            }
-            else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
-                names->push_back(fullName);
-        }
-        PHYSFS_freeList(list);
-    }
-
-    void enumerateInfo(const Ogre::String &dirpath, Ogre::FileInfoListPtr &infos, const Ogre::String &pattern, bool recurse, bool dirs) const_OGRE2
-    {
-        char **list = PHYSFS_enumerateFiles((mBasePath+dirpath).c_str());
-        for(size_t i = 0;list[i];i++)
-        {
-            std::string fullName = dirpath+list[i];
-            if(PHYSFS_isDirectory((mBasePath+fullName).c_str()))
-            {
-                if(dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
-                {
-                    Ogre::FileInfo info;
-                    info.archive = this;
-                    info.filename = fullName;
-                    info.basename = list[i];
-                    info.path = dirpath;
-                    info.compressedSize = 0;
-                    info.uncompressedSize = 0;
-                    infos->push_back(info);
-                }
-                if(recurse)
-                {
-                    fullName += "/";
-                    enumerateInfo(fullName, infos, pattern, recurse, dirs);
-                }
-            }
-            else if(!dirs && (pattern.empty() || Ogre::StringUtil::match(fullName, pattern)))
-            {
-                Ogre::FileInfo info;
-                info.archive = this;
-                info.filename = fullName;
-                info.basename = list[i];
-                info.path = dirpath;
-                info.compressedSize = 0;
-                info.uncompressedSize = 0;
-                infos->push_back(info);
-            }
-        }
-        PHYSFS_freeList(list);
-    }
-
-public:
-    PhysFSArchive(const Ogre::String &name, const Ogre::String &archType, const Ogre::String &base, bool readOnly)
-      : Archive(name, archType), mBasePath(base)
-    { mReadOnly = readOnly; }
-
-    virtual bool isCaseSensitive() const { return true; }
-
-    virtual void load() { }
-    virtual void unload() { }
-
-    // Open a file in the archive.
-    virtual Ogre::DataStreamPtr open(const Ogre::String &filename, bool readOnly) const_OGRE2
-    {
-        PhysFileStreamPtr stream;
-        PHYSFS_File *file = nullptr;
-        if(readOnly)
-            file = PHYSFS_openRead((mBasePath+"/"+filename).c_str());
-        else if(!mReadOnly)
-            file = PHYSFS_openAppend((mBasePath+"/"+filename).c_str());
-        if(file)
-            stream.bind(OGRE_NEW_T(PhysFileStream, Ogre::MEMCATEGORY_GENERAL)(file),
-                                   Ogre::SPFM_DELETE_T);
-        return stream;
-    }
-
-    virtual Ogre::StringVectorPtr list(bool recursive, bool dirs)
-    {
-        Ogre::StringVectorPtr names(OGRE_NEW_T(Ogre::StringVector, Ogre::MEMCATEGORY_GENERAL)(),
-                                    Ogre::SPFM_DELETE_T);
-        enumerateNames("/", names, Ogre::String(), recursive, dirs);
-        return names;
-    }
-    Ogre::FileInfoListPtr listFileInfo(bool recursive, bool dirs)
-    {
-        Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList, Ogre::MEMCATEGORY_GENERAL)(),
-                                    Ogre::SPFM_DELETE_T);
-        enumerateInfo("/", infos, Ogre::String(), recursive, dirs);
-        return infos;
-    }
-
-    virtual Ogre::StringVectorPtr find(const Ogre::String &pattern, bool recursive, bool dirs)
-    {
-        Ogre::StringVectorPtr names(OGRE_NEW_T(Ogre::StringVector, Ogre::MEMCATEGORY_GENERAL)(),
-                                    Ogre::SPFM_DELETE_T);
-        enumerateNames("/", names, pattern, recursive, dirs);
-        return names;
-    }
-    virtual Ogre::FileInfoListPtr findFileInfo(const Ogre::String &pattern, bool recursive, bool dirs) const_OGRE2
-    {
-        Ogre::FileInfoListPtr infos(OGRE_NEW_T(Ogre::FileInfoList, Ogre::MEMCATEGORY_GENERAL)(),
-                                    Ogre::SPFM_DELETE_T);
-        enumerateInfo("/", infos, pattern, recursive, dirs);
-        return infos;
-    }
-
-    virtual bool exists(const Ogre::String &filename)
-    {
-        return PHYSFS_exists((mBasePath+"/"+filename).c_str());
-    }
-
-    virtual time_t getModifiedTime(const Ogre::String &filename)
-    {
-        return PHYSFS_getLastModTime((mBasePath+"/"+filename).c_str());
-    }
-};
-
 } // namespace
 
 
 namespace TK
 {
 
-//! OSG Reader for physfs
-class ReaderPhysFS : public osgDB::ReaderWriter, public Singleton<ReaderPhysFS>
-{
-    static thread_local bool sAcceptExtensions;
+class PhysFSReadCallback : public osgDB::ReadFileCallback {
+    typedef osgDB::ReaderWriter::ReadResult ReadResult;
 
-    static bool open(PhysFSStream &istream, const std::string &fname, const Options *options)
+    static bool open(PhysFSStream &istream, const std::string &fname, const osgDB::Options *options)
     {
         // try to find the proper path in vfs
         if(istream.open(fname.c_str()))
@@ -424,34 +212,30 @@ class ReaderPhysFS : public osgDB::ReaderWriter, public Singleton<ReaderPhysFS>
             for(const auto &path : pl)
             {
                 std::string searchpath = path + "/" + fname;
+                istream.clear();
                 if(istream.open(searchpath.c_str()))
                     return true;
             }
         }
+        const osgDB::FilePathList &pl = osgDB::Registry::instance()->getDataFilePathList();
+        for(const auto &path : pl)
+        {
+            std::string searchpath = path + "/" + fname;
+            istream.clear();
+            if(istream.open(searchpath.c_str()))
+                return true;
+        }
         return false;
     }
 
-public:
-
-    virtual const char *className() const { return "PhysFS Reader"; }
-
-    virtual bool acceptsExtension(const std::string &ext) const
-    {
-        /* HACK: If we're recursing, we won't accept any extensions so we can
-         * get the appropriate ReaderWriter format handler. */
-        return sAcceptExtensions;
-    }
-
 #define WRAP_READER(func)                                                           \
-    virtual ReadResult func(const std::string &fname, const Options *options) const \
+    virtual ReadResult func(const std::string &fname, const osgDB::Options *options)\
     {                                                                               \
         PhysFSStream istream;                                                       \
         if(!open(istream, fname, options))                                          \
             return ReadResult::FILE_NOT_FOUND;                                      \
                                                                                     \
-        sAcceptExtensions = false;                                                  \
         const osgDB::ReaderWriter *rw = osgDB::Registry::instance()->getReaderWriterForExtension(osgDB::getFileExtension(fname)); \
-        sAcceptExtensions = true;                                                   \
         if(rw) return rw->func(istream, options);                                   \
         return ReadResult::ERROR_IN_READING_FILE;                                   \
     }
@@ -461,10 +245,10 @@ public:
     WRAP_READER(readNode)
     WRAP_READER(readShader)
 #undef WRAP_READER
+
+public:
+    PhysFSReadCallback() { }
 };
-thread_local bool ReaderPhysFS::sAcceptExtensions = true;
-template<>
-ReaderPhysFS* Singleton<ReaderPhysFS>::sInstance = nullptr;
 
 
 class PhysFSDataManager : public MyGUI::DataManager {
@@ -518,10 +302,10 @@ public:
     /** Get data stream from specified resource name.
      *  @param _name Resource name (usually file name).
      */
-    virtual MyGUI::IDataStream *getData(const std::string &_name)
+    virtual MyGUI::IDataStream *getData(const std::string &fname)
     {
         std::unique_ptr<PhysFSDataStream> istream(new PhysFSDataStream());
-        if(istream->open((mBasePath+_name).c_str()))
+        if(istream->open((mBasePath+"/"+fname).c_str()))
             return istream.release();
         return nullptr;
     }
@@ -529,28 +313,28 @@ public:
     /** Free data stream.
      *  @param _data Data stream.
      */
-    virtual void freeData(MyGUI::IDataStream *_data)
+    virtual void freeData(MyGUI::IDataStream *data)
     {
-        delete _data;
+        delete data;
     }
 
     /** Is data with specified name exist.
      *  @param _name Resource name.
      */
-    virtual bool isDataExist(const std::string &_name)
+    virtual bool isDataExist(const std::string &fname)
     {
-        return PHYSFS_exists((mBasePath+_name).c_str()) != 0;
+        return PHYSFS_exists((mBasePath+"/"+fname).c_str()) != 0;
     }
 
     /** Get all data names with names that matches pattern.
      *  @param _pattern Pattern to match (for example "*.layout").
      */
-    virtual const MyGUI::VectorString &getDataListNames(const std::string &_pattern)
+    virtual const MyGUI::VectorString &getDataListNames(const std::string &pattern)
     {
         static MyGUI::VectorString name_list;
         MyGUI::VectorString().swap(name_list);
-        std::cerr<< "Searching for "<<_pattern <<std::endl;
-        enumerateFiles(name_list, _pattern);
+        Log::get().stream()<< "Searching for "<<pattern;
+        enumerateFiles(name_list, pattern);
         return name_list;
     }
 
@@ -559,11 +343,11 @@ public:
      *  @return Return full path to specified data.
      *  For example getDataPath("My.layout") might return "C:\path\to\project\data\My.layout"
      */
-    virtual const std::string &getDataPath(const std::string &_name)
+    virtual const std::string &getDataPath(const std::string &fname)
     {
         static std::string fullpath;
-        fullpath = findFilePath(_name);
-        std::cerr<< "Found "<<fullpath<<" for "<<_name <<std::endl;
+        fullpath = findFilePath(fname);
+        Log::get().stream()<< "Found "<<fullpath<<" for "<<fname;
         return fullpath;
     }
 };
@@ -581,35 +365,13 @@ PhysFSFactory::PhysFSFactory()
         throw std::runtime_error(sstr.str());
     }
 
-    ReaderPhysFS *rdr = new ReaderPhysFS();
-    osgDB::Registry::instance()->addReaderWriter(rdr);
+    osgDB::Registry::instance()->setReadFileCallback(new PhysFSReadCallback());
 }
 
 PhysFSFactory::~PhysFSFactory()
 {
-    osgDB::Registry::instance()->removeReaderWriter(ReaderPhysFS::getPtr());
-    delete ReaderPhysFS::getPtr();
+    osgDB::Registry::instance()->setReadFileCallback(nullptr);
     PHYSFS_deinit();
-}
-
-const Ogre::String &PhysFSFactory::getType() const
-{
-    static const Ogre::String name = "PhysFS";
-    return name;
-}
-
-
-Ogre::Archive *PhysFSFactory::createInstance(const Ogre::String &name, bool readOnly)
-{
-    Ogre::String base = name;
-    if(!base.empty() && *base.rbegin() == '/')
-        base.erase(base.length()-1);
-    return new PhysFSArchive(name, getType(), base, readOnly);
-}
-
-void PhysFSFactory::destroyInstance(Ogre::Archive *inst)
-{
-    delete inst;
 }
 
 void PhysFSFactory::addPath(const char *path, const char *mountPoint, bool append) const
@@ -618,9 +380,9 @@ void PhysFSFactory::addPath(const char *path, const char *mountPoint, bool appen
         Log::get().stream(Log::Level_Error)<< "Failed to add "<<path<<": "<<PHYSFS_getLastError();
 }
 
-} // namespace TK
+MyGUI::DataManager *PhysFSFactory::createDataManager(std::string&& base) const
+{
+    return new PhysFSDataManager(std::move(base));
+}
 
-template<>
-MyGUI::DataManager* MyGUI::Singleton<MyGUI::DataManager>::msInstance = nullptr;
-template<>
-const char* MyGUI::Singleton<MyGUI::DataManager>::mClassTypeName = "PhysFSDataManager";
+} // namespace TK

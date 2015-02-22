@@ -6,10 +6,14 @@
 #include <string>
 
 
-namespace Ogre
+namespace osg
 {
-    class RenderWindow;
-    class SceneManager;
+    class Group;
+}
+
+namespace osgViewer
+{
+    class Viewer;
 }
 
 namespace MyGUI
@@ -19,14 +23,12 @@ namespace MyGUI
     class TextBox;
 }
 
-
 namespace TK
 {
 
 class Console;
 
 class Gui : public GuiIface {
-    MyGUI::OgrePlatform *mPlatform;
     MyGUI::Gui *mGui;
 
     MyGUI::TextBox *mStatusMessages;
@@ -36,7 +38,7 @@ class Gui : public GuiIface {
     int mActiveModes;
 
 public:
-    Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr);
+    Gui(osgViewer::Viewer *viewer, osg::Group *sceneroot);
     virtual ~Gui();
 
     virtual void printToConsole(const std::string &str) final;

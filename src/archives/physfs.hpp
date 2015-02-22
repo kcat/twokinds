@@ -1,27 +1,27 @@
 #ifndef ARCHIVES_PHYSFS_HPP
 #define ARCHIVES_PHYSFS_HPP
 
-#include <OgreArchiveFactory.h>
+#include <string>
 
 #include "singleton.hpp"
+
+namespace MyGUI
+{
+    class DataManager;
+}
 
 namespace TK
 {
 
-// An archive factory for PhysFS. Only one archive is made here, and it has
-// access to the whole PhysFS file hierarchy.
-class PhysFSFactory : public Ogre::ArchiveFactory, public Singleton<PhysFSFactory>
+// A factory for handling PhysFS.
+class PhysFSFactory : public Singleton<PhysFSFactory>
 {
 public:
     PhysFSFactory();
     virtual ~PhysFSFactory();
 
-    virtual const Ogre::String& getType() const;
-
-    virtual Ogre::Archive *createInstance(const Ogre::String &name, bool readOnly);
-    virtual void destroyInstance(Ogre::Archive *inst);
-
     void addPath(const char *path, const char *mountPoint=nullptr, bool append=false) const;
+    MyGUI::DataManager *createDataManager(std::string&& base) const;
 };
 
 } // namespace TK

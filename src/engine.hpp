@@ -1,8 +1,11 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
-#include <OgreWindowEventUtilities.h>
-#include <OgreFrameListener.h>
+#include <string>
+#include <map>
+
+#include <osg/ref_ptr>
+#include <osg/Vec3f>
 
 struct SDL_Window;
 struct SDL_WindowEvent;
@@ -12,15 +15,9 @@ struct SDL_MouseButtonEvent;
 struct SDL_KeyboardEvent;
 struct SDL_TextInputEvent;
 
-namespace Ogre
+namespace osg
 {
-    class Root;
-    class RenderWindow;
-    class SceneManager;
-    class PageManager;
-    class Light;
     class Camera;
-    class Viewport;
 }
 
 namespace TK
@@ -29,27 +26,22 @@ namespace TK
 class Input;
 class Gui;
 
-class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
+class Engine
 {
     typedef void (Engine::*CmdFuncT)(const std::string&);
     typedef std::map<std::string,CmdFuncT> CommandFuncMap;
 
     SDL_Window *mSDLWindow;
 
-    Ogre::Root *mRoot;
-    Ogre::RenderWindow *mWindow;
-    Ogre::SceneManager *mSceneMgr;
-    Ogre::Camera *mCamera;
-    Ogre::Viewport *mViewport; // Not used with Ogre 2.0!
-
     Input *mInput;
     Gui *mGui;
 
     bool mDisplayDebugStats;
 
-    const CommandFuncMap mCommandFuncs;
+    osg::ref_ptr<osg::Camera> mCamera;
+    osg::Vec3f mCameraPos;
 
-    Ogre::RenderWindow *createRenderWindow(SDL_Window *win);
+    const CommandFuncMap mCommandFuncs;
 
     void handleWindowEvent(const SDL_WindowEvent &evt);
     bool pumpEvents();
@@ -59,9 +51,6 @@ class Engine : public Ogre::WindowEventListener, public Ogre::FrameListener
     void toggleDebugDisplayCmd(const std::string &value);
     void saveCfgCmd(const std::string &value);
     void internalCommand(const std::string &key, const std::string &value);
-
-    virtual bool frameStarted(const Ogre::FrameEvent &evt);
-    virtual bool frameRenderingQueued(const Ogre::FrameEvent &evt);
 
 public:
     Engine(void);

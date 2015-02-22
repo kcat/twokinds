@@ -6,27 +6,16 @@
 #include <sstream>
 #include <iomanip>
 
-#include <OgreRoot.h>
-#include <OgreSceneManager.h>
-#include <OgreRenderWindow.h>
-#include <OgreCamera.h>
-#include <OgreViewport.h>
-#include <OgreArchiveManager.h>
-#include <OgreMaterialManager.h>
-#include <OgreEntity.h>
-#include <OgreSceneNode.h>
-#include <OgreTechnique.h>
-#include <OgreConfigFile.h>
-
-#include <OgreRTShaderSystem.h>
-
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-#include <Compositor/OgreCompositorManager2.h>
-#endif
 #include <OgreLogManager.h>
+#include <OgreConfigFile.h>
+#include <OgreMath.h>
+#include <OgreMatrix3.h>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
+
+#include <osgViewer/Viewer>
+#include <osgDB/Registry>
 
 #include "archives/physfs.hpp"
 #include "input/input.hpp"
@@ -37,76 +26,8 @@
 #include "cvars.hpp"
 #include "log.hpp"
 
-
-namespace
-{
-
-// Lifted from SampleBrowser.h
-class ShaderGeneratorTechniqueResolverListener : public Ogre::MaterialManager::Listener
-{
-protected:
-    Ogre::RTShader::ShaderGenerator &mShaderGenerator;
-
-public:
-    ShaderGeneratorTechniqueResolverListener()
-      : mShaderGenerator(Ogre::RTShader::ShaderGenerator::getSingleton())
-    {
-        Ogre::MaterialManager::getSingleton().addListener(this);
-    }
-    virtual ~ShaderGeneratorTechniqueResolverListener()
-    {
-        Ogre::MaterialManager::getSingleton().removeListener(this);
-    }
-
-    /**
-     * This is the hook point where shader based technique will be created. It
-     * will be called whenever the material manager won't find appropriate
-     * technique that satisfy the target scheme name. If the scheme name is out
-     * target RT Shader System scheme name we will try to create shader
-     * generated technique for it.
-     */
-    virtual Ogre::Technique *handleSchemeNotFound(unsigned short schemeIndex,
-        const Ogre::String &schemeName, Ogre::Material *originalMaterial,
-        unsigned short lodIndex, const Ogre::Renderable *rend)
-    {
-        Ogre::Technique *generatedTech = nullptr;
-
-        // Case this is the default shader generator scheme.
-        if(schemeName == Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME)
-        {
-            bool techniqueCreated;
-
-            // Create shader generated technique for this material.
-            techniqueCreated = mShaderGenerator.createShaderBasedTechnique(
-                originalMaterial->getName(), Ogre::MaterialManager::DEFAULT_SCHEME_NAME,
-                schemeName
-            );
-
-            // Case technique registration succeeded.
-            if(techniqueCreated)
-            {
-                // Force creating the shaders for the generated technique.
-                mShaderGenerator.validateMaterial(schemeName, originalMaterial->getName());
-
-                // Grab the generated technique.
-                Ogre::Material::TechniqueIterator itTech = originalMaterial->getTechniqueIterator();
-                while(itTech.hasMoreElements())
-                {
-                    Ogre::Technique *curTech = itTech.getNext();
-                    if(curTech->getSchemeName() == schemeName)
-                    {
-                        generatedTech = curTech;
-                        break;
-                    }
-                }
-            }
-        }
-
-        return generatedTech;
-    }
-};
-
-} // namespace
+#include "render/mygui_osgrendermanager.h"
+#include "render/sdl2_osggraphicswindow.h"
 
 
 namespace TK
@@ -117,15 +38,9 @@ CVAR(CVarInt, vid_height, 720);
 CVAR(CVarBool, vid_fullscreen, false);
 CVAR(CVarBool, vid_showfps, false);
 
-CVAR(CVarString, r_rendersystem, "");
 
 Engine::Engine(void)
   : mSDLWindow(nullptr)
-  , mRoot(nullptr)
-  , mWindow(nullptr)
-  , mSceneMgr(nullptr)
-  , mCamera(nullptr)
-  , mViewport(nullptr)
   , mInput(nullptr)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
@@ -147,6 +62,8 @@ Engine::~Engine(void)
 {
     World::get().deinitialize();
 
+    mCamera = nullptr;
+
     Log::get().setGuiIface(nullptr);
 
     delete mGui;
@@ -155,33 +72,6 @@ Engine::~Engine(void)
     delete mInput;
     mInput = nullptr;
 
-    if(mRoot)
-    {
-        mRoot->removeFrameListener(this);
-
-        if(mSceneMgr)
-        {
-            if(mCamera)
-                mSceneMgr->destroyCamera(mCamera);
-            mCamera = nullptr;
-
-            mRoot->destroySceneManager(mSceneMgr);
-            mSceneMgr = nullptr;
-        }
-
-        if(mWindow)
-        {
-            if(mViewport)
-                mWindow->removeViewport(mViewport->getZOrder());
-            mViewport = nullptr;
-
-            mWindow->destroy();
-            mWindow = nullptr;
-        }
-
-        delete mRoot;
-        mRoot = nullptr;
-    }
     Log::get().setLog(nullptr);
     OGRE_DELETE Ogre::LogManager::getSingletonPtr();
 
@@ -212,65 +102,27 @@ bool Engine::parseOptions(int argc, char *argv[])
 }
 
 
-Ogre::RenderWindow *Engine::createRenderWindow(SDL_Window *win)
-{
-    // Get the native window handle
-    struct SDL_SysWMinfo wmInfo;
-    SDL_VERSION(&wmInfo.version);
-
-    if(SDL_GetWindowWMInfo(win, &wmInfo) == SDL_FALSE)
-        throw std::runtime_error("Couldn't get WM Info!");
-
-    Ogre::NameValuePairList params;
-    Ogre::String winHandle;
-    switch(wmInfo.subsystem)
-    {
-#if defined(SDL_VIDEO_DRIVER_WINDOWS)
-    case SDL_SYSWM_WINDOWS:
-        winHandle = Ogre::StringConverter::toString((DWORD_PTR)wmInfo.info.win.window);
-        break;
-#endif
-#if defined(SDL_VIDEO_DRIVER_COCOA)
-    case SDL_SYSWM_COCOA:
-        // Required to make OGRE play nice with our window
-        params.insert(std::make_pair("macAPI", "cocoa"));
-        params.insert(std::make_pair("macAPICocoaUseNSView", "true"));
-
-        winHandle = Ogre::StringConverter::toString(WindowContentViewHandle(wmInfo));
-        break;
-#endif
-#if defined(SDL_VIDEO_DRIVER_X11)
-    case SDL_SYSWM_X11:
-        winHandle = Ogre::StringConverter::toString((unsigned long)wmInfo.info.x11.window);
-        break;
-#endif
-    default:
-        throw std::runtime_error("Unsupported windowing subsystem: " +
-                                 Ogre::StringConverter::toString(wmInfo.subsystem));
-    }
-    /* TODO: externalWindowHandle is deprecated according to the source code.
-     * Figure out a way to get parentWindowHandle to work properly. On Linux/
-     * X11 it causes an occasional GLXBadDrawable error. */
-    params.insert(std::make_pair("externalWindowHandle", std::move(winHandle)));
-
-    int width, height;
-    Ogre::String title = SDL_GetWindowTitle(win);
-    SDL_GetWindowSize(win, &width, &height);
-    bool fs = (SDL_GetWindowFlags(win)&SDL_WINDOW_FULLSCREEN);
-    return mRoot->createRenderWindow(title, width, height, fs, &params);
-}
-
-
 void Engine::handleWindowEvent(const SDL_WindowEvent &evt)
 {
     switch(evt.event)
     {
-        case SDL_WINDOWEVENT_SHOWN:
-            mWindow->setVisible(true);
+        case SDL_WINDOWEVENT_MOVED:
+        {
+            int width, height;
+            SDL_GetWindowSize(mSDLWindow, &width, &height);
+            mCamera->getGraphicsContext()->resized(evt.data1, evt.data2, width, height);
             break;
+        }
+        case SDL_WINDOWEVENT_RESIZED:
+        {
+            int x, y;
+            SDL_GetWindowPosition(mSDLWindow, &x, &y);
+            mCamera->getGraphicsContext()->resized(x, y, evt.data1, evt.data2);
+            break;
+        }
 
+        case SDL_WINDOWEVENT_SHOWN:
         case SDL_WINDOWEVENT_HIDDEN:
-            mWindow->setVisible(false);
             break;
 
         case SDL_WINDOWEVENT_EXPOSED:
@@ -314,11 +166,18 @@ bool Engine::pumpEvents()
                 /* Rotation (x motion rotates around y, y motion rotates around x) */
                 x += evt.motion.yrel * 0.1f;
                 y += evt.motion.xrel * 0.1f;
-                x = Ogre::Math::Clamp(x, -89.0f, 89.0f);
+                x = std::min(std::max(x, -89.0f), 89.0f);
 
-                Ogre::Matrix3 mat3;
-                mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-                mCamera->setOrientation(mat3);
+                //Ogre::Matrix3 mat3;
+                //mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
+
+                osg::Matrixf matf;
+                matf.makeRotate(             0.0f, osg::Vec3f(0.0f, 0.0f, 1.0f),
+                               -y*3.14159f/180.0f, osg::Vec3f(0.0f, 1.0f, 0.0f),
+                                x*3.14159f/180.0f, osg::Vec3f(1.0f, 0.0f, 0.0f));
+                matf.setTrans(mCameraPos);
+
+                mCamera->setViewMatrix(matf);
             }
             break;
         case SDL_MOUSEWHEEL:
@@ -355,7 +214,6 @@ void Engine::quitCmd(const std::string&)
 
 void Engine::toggleBoundingBoxCmd(const std::string&)
 {
-    mSceneMgr->showBoundingBoxes(!mSceneMgr->getShowBoundingBoxes());
 }
 
 void Engine::toggleDebugDisplayCmd(const std::string&)
@@ -391,8 +249,6 @@ void Engine::internalCommand(const std::string &key, const std::string &value)
 bool Engine::go(void)
 {
     Log::get().message("Initializing SDL...");
-    // Kindly ask SDL not to trash our OGL context
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
     // Init everything except audio (we will use OpenAL for that)
     if(SDL_Init(SDL_INIT_EVERYTHING & ~SDL_INIT_AUDIO) != 0)
@@ -402,13 +258,28 @@ bool Engine::go(void)
         throw std::runtime_error(sstr.str());
     }
 
-    // Construct Ogre::Root
-    Log::get().message("Initializing Ogre Root...");
-    mRoot = new Ogre::Root("plugins.cfg", Ogre::String(), Ogre::String());
+    // Setup resources
+    Log::get().message("Initializing resources...");
+    {
+        PhysFSFactory *factory = new PhysFSFactory();
 
-    Ogre::ArchiveManager::getSingleton().addArchiveFactory(new PhysFSFactory);
+        // Load resource paths from config file
+        Ogre::ConfigFile cf;
+        cf.load("resources.cfg");
+
+        Ogre::StringVector paths = cf.getMultiSetting("source", "General");
+        for(const auto &path : paths)
+        {
+            Log::get().stream()<< "  Adding source path "<<path;
+            factory->addPath(path.c_str());
+        }
+
+        osgDB::FilePathList dbpaths{"/materials/textures", "/meshes", "/MyGUI_Media"};
+        osgDB::Registry::instance()->setDataFilePathList(dbpaths);
+    }
 
     // Configure
+    osg::ref_ptr<osgViewer::Viewer> viewer;
     {
         try {
             Ogre::ConfigFile cf;
@@ -431,40 +302,22 @@ bool Engine::go(void)
             // Ignore if config file not found
         }
 
-        Log::get().message("Setting up RenderSystem...");
-        Ogre::RenderSystem *rsys = nullptr;
-        if(!r_rendersystem->empty())
-        {
-            if(!(rsys=mRoot->getRenderSystemByName(*r_rendersystem)))
-                Log::get().stream(Log::Level_Error)<< "  Render system \""<<*r_rendersystem<<"\" not found";
-        }
-        if(!rsys)
-        {
-            const Ogre::RenderSystemList &renderers = mRoot->getAvailableRenderers();
-            for(Ogre::RenderSystem *renderer : renderers)
-            {
-                if(!rsys) rsys = renderer;
-                Log::get().stream()<< "  Found renderer \""<<renderer->getName()<<"\"";
-            }
-            if(!rsys)
-                throw std::runtime_error("Failed to find a usable RenderSystem");
-        }
-        // Force the fixed-function pipeline off
-        rsys->setConfigOption("Fixed Pipeline Enabled", "No");
-        const Ogre::String &err = rsys->validateConfigOptions();
-        if(!err.empty())
-            throw std::runtime_error("RenderSystem config error: "+err);
-        mRoot->setRenderSystem(rsys);
-        Log::get().stream()<< "  Initialized "<<rsys->getName();
-
-
         int width = *vid_width;
         int height = *vid_height;
         int xpos = SDL_WINDOWPOS_CENTERED;
         int ypos = SDL_WINDOWPOS_CENTERED;
-        Uint32 flags = SDL_WINDOW_SHOWN;
+        Uint32 flags = SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN;
         if(*vid_fullscreen)
             flags |= SDL_WINDOW_FULLSCREEN;
+
+        SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, SDL_TRUE);
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, SDL_TRUE);
+        SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
         Log::get().stream()<< "Creating window "<<width<<"x"<<height<<", flags 0x"<<std::hex<<flags;
         mSDLWindow = SDL_CreateWindow("Twokinds", xpos, ypos, width, height, flags);
@@ -475,99 +328,39 @@ bool Engine::go(void)
             throw std::runtime_error(sstr.str());
         }
 
-        mRoot->initialise(false);
-        mWindow = createRenderWindow(mSDLWindow);
+        graphicswindow_SDL2();
+        osg::ref_ptr<osg::GraphicsContext::Traits> traits = new osg::GraphicsContext::Traits;
+        SDL_GetWindowPosition(mSDLWindow, &traits->x, &traits->y);
+        SDL_GetWindowSize(mSDLWindow, &traits->width, &traits->height);
+        traits->windowName = SDL_GetWindowTitle(mSDLWindow);
+        traits->windowDecoration = !(SDL_GetWindowFlags(mSDLWindow)&SDL_WINDOW_BORDERLESS);
+        traits->screenNum = SDL_GetWindowDisplayIndex(mSDLWindow);
+        // FIXME: Some way to get these settings back from the SDL window?
+        traits->red = 8;
+        traits->green = 8;
+        traits->blue = 8;
+        traits->alpha = 8;
+        traits->depth = 24;
+        traits->stencil = 8;
+        traits->doubleBuffer = true;
+        traits->inheritedWindowData = new GraphicsWindowSDL2::WindowData(mSDLWindow);
+
+        osg::ref_ptr<osg::GraphicsContext> gc = osg::GraphicsContext::createGraphicsContext(traits.get());
+        if(!gc.valid()) throw std::runtime_error("Failed to create GraphicsContext");
+
+        mCamera = new osg::Camera;
+        mCamera->setGraphicsContext(gc.get());
+        mCamera->setViewport(0, 0, width, height);
+        mCamera->setClearColor(osg::Vec4(0.5f, 0.5f, 0.5f, 0.0f));
+
+        viewer = new osgViewer::Viewer();
+        viewer->setCamera(mCamera.get());
     }
     SDL_ShowCursor(0);
 
-    // Setup resources
-    Log::get().message("Initializing resources...");
-    {
-        auto &resGrpMgr = Ogre::ResourceGroupManager::getSingleton();
-        resGrpMgr.createResourceGroup("Shaders");
-        resGrpMgr.createResourceGroup("Materials");
-        resGrpMgr.createResourceGroup("Textures");
-        resGrpMgr.createResourceGroup("Meshes");
-        resGrpMgr.createResourceGroup("Terrain");
-        resGrpMgr.createResourceGroup("GUI");
-
-        // Load resource paths from config file
-        Ogre::ConfigFile cf;
-        cf.load("resources.cfg");
-
-        Ogre::StringVector paths = cf.getMultiSetting("source", "General");
-        for(const auto &path : paths)
-        {
-            Log::get().stream()<< "  Adding source path "<<path;
-            PhysFSFactory::get().addPath(path.c_str());
-        }
-
-        // Go through all sections & settings in the file
-        Ogre::ConfigFile::SectionIterator seci = cf.getSectionIterator();
-        while(seci.hasMoreElements())
-        {
-            Ogre::String secName = seci.peekNextKey();
-            Ogre::ConfigFile::SettingsMultiMap *settings = seci.getNext();
-            for(const auto &i : *settings)
-            {
-                if(i.first != "path")
-                    continue;
-                resGrpMgr.addResourceLocation(
-                    i.second, PhysFSFactory::get().getType(),
-                    secName, true
-                );
-            }
-        }
-        resGrpMgr.addResourceLocation("", PhysFSFactory::get().getType());
-    }
-
-    /* Necessary for D3D11/GL3+. They have no fixed function pipeline. Must be
-     * initialized before resources! */
-    Ogre::RTShader::ShaderGenerator::initialize();
-
-    ShaderGeneratorTechniqueResolverListener sgtrl;
-
-    /* Initialize all resource groups. Ogre is sensitive to the shaders being
-     * initialized after the materials, so ensure the shaders get initialized
-     * first. */
-    Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Shaders");
-    Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup("Materials");
-    Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
-
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-    const size_t numThreads = std::max(1u, Ogre::PlatformInformation::getNumLogicalCores());
-    Ogre::InstancingTheadedCullingMethod threadedCullingMethod = Ogre::INSTANCING_CULLING_SINGLETHREAD;
-    if(numThreads > 1)
-        threadedCullingMethod = Ogre::INSTANCING_CULLING_THREADED;
-    mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC, numThreads, threadedCullingMethod);
-#else
-    mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC);
-#endif
-
-    {
-        auto &shaderGenerator = Ogre::RTShader::ShaderGenerator::getSingleton();
-        shaderGenerator.addSceneManager(mSceneMgr);
-
-        // Add a specialized sub-render (per-pixel lighting) state to the default scheme render state
-        Ogre::RTShader::RenderState *rstate = shaderGenerator.createOrRetrieveRenderState(
-            Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME
-        ).first;
-        rstate->reset();
-
-        //shaderGenerator.addSubRenderStateFactory(new Ogre::RTShader::PerPixelLightingFactory);
-        rstate->addTemplateSubRenderState(shaderGenerator.createSubRenderState(Ogre::RTShader::PerPixelLighting::Type));
-    }
-
-    mCamera = mSceneMgr->createCamera("PlayerCam");
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-    mRoot->getCompositorManager2()->addWorkspace(
-        mSceneMgr, mWindow, mCamera, "MainWorkspace", true
-    );
-#else
-    mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(mCamera);
-    mViewport = mWindow->addViewport(mCamera);
-    mViewport->setMaterialScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
-#endif
+    viewer->setSceneData(new osg::Group());
+    viewer->requestContinuousUpdate();
+    viewer->realize();
 
     // Setup Input subsystem
     Log::get().message("Initializing input...");
@@ -575,42 +368,66 @@ bool Engine::go(void)
 
     // Setup GUI subsystem
     Log::get().message("Initializing GUI...");
-    mGui = new Gui(mWindow, mSceneMgr);
+    mGui = new Gui(viewer.get(), static_cast<osg::Group*>(viewer->getSceneData()));
+
     Log::get().setGuiIface(mGui);
     for(const auto &cmd : mCommandFuncs)
         mGui->addConsoleCallback(cmd.first.c_str(), makeDelegate(this, &Engine::internalCommand));
     CVar::registerAll();
 
-    // Alter the camera aspect ratio to match the window
-    mCamera->setAspectRatio(Ogre::Real(mWindow->getWidth()) / Ogre::Real(mWindow->getHeight()));
-    mCamera->setPosition(Ogre::Vector3(0.0f, 0.0f, 0.0f));
-    mCamera->setNearClipDistance(1.0f);
-    mCamera->setFarClipDistance(50000.0f);
-    if(mRoot->getRenderSystem()->getCapabilities()->hasCapability(Ogre::RSC_INFINITE_FAR_PLANE))
-        mCamera->setFarClipDistance(0.0f);   // enable infinite far clip distance if we can
-
-    /* Make a light so we can see things */
-    mSceneMgr->setAmbientLight(Ogre::ColourValue(137.0f/255.0f, 140.0f/255.0f, 160.0f/255.0f));
-    Ogre::SceneNode *lightNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-    Ogre::Light *l = mSceneMgr->createLight();
-    lightNode->attachObject(l);
-    l->setType(Ogre::Light::LT_DIRECTIONAL);
-    l->setDirection(Ogre::Vector3(0.55f, -0.3f, 0.75f).normalisedCopy());
-    l->setDiffuseColour(Ogre::ColourValue(1.0f, 252.0f/255.0f, 238.0f/255.0f));
-
     // Set up the terrain
-    World::get().initialize(mCamera, l);
+    //World::get().initialize(mCamera, l);
 
     // And away we go!
-    mRoot->addFrameListener(this);
-    mRoot->startRendering();
+    const Uint32 base_time = SDL_GetTicks();
+    double last_time = 0.0;
+    while(!viewer->done() && pumpEvents())
+    {
+        const Uint8 *keystate = SDL_GetKeyboardState(NULL);
+        if(keystate[SDL_SCANCODE_ESCAPE])
+            break;
+
+        Uint32 current_time = SDL_GetTicks() - base_time;
+        double frame_time = current_time / 1000.0;
+        if(frame_time < last_time)
+            throw std::runtime_error("Tick count overflow");
+
+
+        double timediff = std::min(1.0/20.0, frame_time-last_time);
+        if(mGui->getMode() == Gui::Mode_Game)
+        {
+            float speed = 60.0f * timediff;
+            if(keystate[SDL_SCANCODE_LSHIFT])
+                speed *= 2.0f;
+
+            osg::Vec3f movedir;
+            if(keystate[SDL_SCANCODE_W])
+                movedir.z() += -1.0f;
+            if(keystate[SDL_SCANCODE_A])
+                movedir.x() += -1.0f;
+            if(keystate[SDL_SCANCODE_S])
+                movedir.z() += +1.0f;
+            if(keystate[SDL_SCANCODE_D])
+                movedir.x() += +1.0f;
+
+            osg::Quat ori = mCamera->getViewMatrix().getRotate();
+            mCameraPos += (ori*movedir)*speed;
+            //pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
+            osg::Matrixf matf(ori);
+            matf.setTrans(mCameraPos);
+            mCamera->setViewMatrix(matf);
+        }
+
+        viewer->frame(timediff);
+        last_time = frame_time;
+    }
 
     saveCfgCmd(std::string());
 
     return true;
 }
 
-
+#if 0
 bool Engine::frameStarted(const Ogre::FrameEvent &evt)
 {
     World::get().update(mCamera->getPosition());
@@ -619,37 +436,6 @@ bool Engine::frameStarted(const Ogre::FrameEvent &evt)
 
 bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
 {
-    if(!pumpEvents() || mWindow->isClosed())
-        return false;
-
-    const Uint8 *keystate = SDL_GetKeyboardState(NULL);
-    if(keystate[SDL_SCANCODE_ESCAPE])
-        return false;
-
-    float frametime = std::min<Ogre::Real>(1.0f/20.0f, evt.timeSinceLastFrame);
-    if(mGui->getMode() == Gui::Mode_Game)
-    {
-        Ogre::Vector3 movedir(0.0f);
-        Ogre::Real speed = 60.0f * frametime;
-        if(keystate[SDL_SCANCODE_LSHIFT])
-            speed *= 2.0f;
-
-        if(keystate[SDL_SCANCODE_W])
-            movedir.z += -1.0f;
-        if(keystate[SDL_SCANCODE_A])
-            movedir.x += -1.0f;
-        if(keystate[SDL_SCANCODE_S])
-            movedir.z += +1.0f;
-        if(keystate[SDL_SCANCODE_D])
-            movedir.x += +1.0f;
-
-        Ogre::Vector3 pos = mCamera->getPosition();
-        Ogre::Quaternion ori = mCamera->getOrientation();
-        pos += (ori*movedir)*speed;
-        pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
-        mCamera->setPosition(pos);
-    }
-
     if(!mDisplayDebugStats)
     {
         if(!*vid_showfps)
@@ -672,5 +458,6 @@ bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
 
     return true;
 }
+#endif
 
 } // namespace TK

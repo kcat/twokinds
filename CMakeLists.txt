@@ -43,8 +43,9 @@ endif()
 set(CMAKE_DEBUG_POSTFIX "_d")
 
 find_package(OGRE REQUIRED)
-find_package(OpenSceneGraph REQUIRED osgDB osgViewer)
+find_package(OpenSceneGraph REQUIRED osgDB osgViewer osgGA)
 find_package(SDL2 REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(MyGUI REQUIRED)
 find_package(PhysFS REQUIRED)
 find_package(libNoise REQUIRED)
@@ -95,6 +96,11 @@ configure_file("${twokinds_SOURCE_DIR}/resources.cfg.in"
 
 set(HDRS src/archives/physfs.hpp
          src/noiseutils/noiseutils.h
+         src/render/mygui_osgdiagnostic.h
+         src/render/mygui_osgrendermanager.h
+         src/render/mygui_osgvertexbuffer.h
+         src/render/mygui_osgtexture.h
+         src/render/sdl2_osggraphicswindow.h
          src/input/iface.hpp
          src/input/input.hpp
          src/gui/iface.hpp
@@ -119,6 +125,10 @@ set(HDRS src/archives/physfs.hpp
 
 set(SRCS src/archives/physfs.cpp
          src/noiseutils/noiseutils.cpp
+         src/render/mygui_osgrendermanager.cpp
+         src/render/mygui_osgvertexbuffer.cpp
+         src/render/mygui_osgtexture.cpp
+         src/render/sdl2_osggraphicswindow.cpp
          src/input/input.cpp
          src/gui/gui.cpp
          src/terrain/buffercache.cpp
@@ -146,16 +156,17 @@ set_property(TARGET twokinds APPEND PROPERTY INCLUDE_DIRECTORIES
     ${MYGUI_INCLUDE_DIRS}
     ${PHYSFS_INCLUDE_DIR}
     ${LIBNOISE_INCLUDE_DIRS}
+    ${OPENGL_INCLUDE_DIR}
 )
 target_link_libraries(twokinds
     ${OGRE_LIBRARIES}
     ${OGRE_RTShaderSystem_LIBRARIES}
     ${OPENSCENEGRAPH_LIBRARIES}
     ${SDL2_LIBRARY}
-    ${MYGUI_PLATFORM_LIBRARIES}
     ${MYGUI_LIBRARIES}
     ${PHYSFS_LIBRARY}
     ${LIBNOISE_LIBRARIES}
+    ${OPENGL_gl_LIBRARY}
 )
 
 install(TARGETS twokinds RUNTIME DESTINATION bin)

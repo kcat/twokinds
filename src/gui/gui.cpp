@@ -2,10 +2,13 @@
 #include "gui.hpp"
 
 #include <MyGUI.h>
-#include <MyGUI_OgrePlatform.h>
 
 #include <SDL_scancode.h>
 #include <SDL_mouse.h>
+
+#include "render/mygui_osgrendermanager.h"
+
+#include "archives/physfs.hpp"
 
 #include "delegates.hpp"
 #include "log.hpp"
@@ -408,40 +411,37 @@ public:
 };
 
 
-Gui::Gui(Ogre::RenderWindow *window, Ogre::SceneManager *sceneMgr)
-  : mPlatform(nullptr)
-  , mGui(nullptr)
+Gui::Gui(osgViewer::Viewer *viewer, osg::Group *sceneroot)
+  : mGui(nullptr)
   , mStatusMessages(nullptr)
   , mConsole(nullptr)
   , mActiveModes(0)
 {
+    MyGUI::DataManager *dataMgr = PhysFSFactory::get().createDataManager("/MyGUI_Media");
+    OSGRenderManager *renderMgr = new OSGRenderManager(viewer, sceneroot);
+    MyGUI::LogManager *logMgr = new MyGUI::LogManager();
     try {
-        mPlatform = new MyGUI::OgrePlatform();
-        switch(Ogre::LogManager::getSingleton().getDefaultLog()->getLogDetail())
+        switch(Log::get().getLevel())
         {
-            case Ogre::LL_BOREME:
-            case Ogre::LL_NORMAL:
-                MyGUI::LogManager::getInstance().setLoggingLevel(MyGUI::LogLevel::Info);
+            case Log::Level_Debug:
+            case Log::Level_Normal:
+                logMgr->setLoggingLevel(MyGUI::LogLevel::Info);
                 break;
-            case Ogre::LL_LOW:
-                MyGUI::LogManager::getInstance().setLoggingLevel(MyGUI::LogLevel::Warning);
+            case Log::Level_Error:
+                logMgr->setLoggingLevel(MyGUI::LogLevel::Warning);
                 break;
         }
-        mPlatform->initialise(window, sceneMgr, "GUI");
-        try {
-            mGui = new MyGUI::Gui();
-            mGui->initialise();
-        }
-        catch(...) {
-            delete mGui;
-            mGui = nullptr;
-            mPlatform->shutdown();
-            throw;
-        }
+        renderMgr->initialise();
+
+        mGui = new MyGUI::Gui();
+        mGui->initialise();
     }
     catch(...) {
-        delete mPlatform;
-        mPlatform = nullptr;
+        delete mGui;
+        mGui = nullptr;
+        delete renderMgr;
+        delete logMgr;
+        delete dataMgr;
         throw;
     }
 
@@ -469,9 +469,9 @@ Gui::~Gui()
     delete mGui;
     mGui = nullptr;
 
-    mPlatform->shutdown();
-    delete mPlatform;
-    mPlatform = nullptr;
+    delete MyGUI::RenderManager::getInstancePtr();
+    delete MyGUI::LogManager::getInstancePtr();
+    delete MyGUI::DataManager::getInstancePtr();
 }
 
 

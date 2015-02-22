@@ -48,6 +48,7 @@ public:
 
     void setLog(Ogre::Log *log);
     void setLevel(Level level) { mLevel = level; }
+    Level getLevel() const { return mLevel; }
 
     void setGuiIface(GuiIface *iface);
 
