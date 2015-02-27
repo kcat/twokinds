@@ -127,18 +127,20 @@ void OSGRenderManager::initialise()
     geode->setCullingActive(false);
     geode->addDrawable(drawable.get());
 
-    osg::ref_ptr<osg::MatrixTransform> trnsfm = new osg::MatrixTransform();
-    trnsfm->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
-    trnsfm->setMatrix(osg::Matrix::identity());
-    trnsfm->addChild(geode.get());
+    osg::ref_ptr<osg::Camera> camera = new osg::Camera();
+    camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+    camera->setProjectionResizePolicy(osg::Camera::FIXED);
+    camera->setProjectionMatrix(osg::Matrix::identity());
+    camera->setViewMatrix(osg::Matrix::identity());
+    camera->setRenderOrder(osg::Camera::POST_RENDER);
+    camera->setClearMask(GL_NONE);
+    camera->addChild(geode.get());
 
-    mGuiRoot = new osg::Projection(osg::Matrix::ortho2D(-1.0, 1.0, -1.0, 1.0));
-    mGuiRoot->addChild(trnsfm.get());
-
+    mGuiRoot = camera;
     mSceneRoot->addChild(mGuiRoot.get());
     mViewer->addEventHandler(new ResizeHandler(this));
 
-    const osg::Viewport *vp = mViewer->getCamera()->getViewport();
+    osg::ref_ptr<osg::Viewport> vp = mViewer->getCamera()->getViewport();
     setViewSize(vp->width(), vp->height());
 
     MYGUI_PLATFORM_LOG(Info, getClassTypeName()<<" successfully initialized");
@@ -219,6 +221,7 @@ void OSGRenderManager::setViewSize(int width, int height)
     if(width < 1) width = 1;
     if(height < 1) height = 1;
 
+    mGuiRoot->setViewport(0, 0, width, height);
     mViewSize.set(width, height);
 
     mInfo.maximumDepth = 1;

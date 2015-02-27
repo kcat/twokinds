@@ -8,7 +8,7 @@
 namespace osg
 {
     class Group;
-    class Projection;
+    class Camera;
     class RenderInfo;
 }
 
@@ -36,7 +36,7 @@ class OSGRenderManager : public MyGUI::RenderManager, public MyGUI::IRenderTarge
 
     bool mIsInitialise;
 
-    osg::ref_ptr<osg::Projection> mGuiRoot;
+    osg::ref_ptr<osg::Camera> mGuiRoot;
 
     // Only valid during drawFrame()!
     osg::RenderInfo *mRenderInfo;
