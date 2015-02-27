@@ -17,35 +17,15 @@ template<>
 Log *Singleton<Log>::sInstance = nullptr;
 
 
-class Log::OgreListener : public Ogre::LogListener {
-public:
-    virtual void messageLogged(const Ogre::String &message, Ogre::LogMessageLevel lml, bool maskDebug, const Ogre::String &logName, bool &skipThisMessage)
-    {
-        Log::Level lvl = Log::Level_Error;
-        switch(lml)
-        {
-            case Ogre::LML_TRIVIAL:  lvl = Log::Level_Debug;  break;
-            case Ogre::LML_NORMAL:   lvl = Log::Level_Normal; break;
-            case Ogre::LML_CRITICAL: lvl = Log::Level_Error;  break;
-        }
-        Log::get().message(message, lvl);
-    }
-};
-
-
-Log::Log(Level level, Ogre::Log *log)
-  : mLevel(level), mGui(nullptr), mLog(nullptr), mOgreListener(nullptr)
+Log::Log(Level level, const std::string &name)
+  : mLevel(level), mGui(nullptr)
 {
-    mOgreListener = new OgreListener();
-    setLog(log);
+    if(!name.empty())
+        setLog(name);
 }
 
 Log::~Log()
 {
-    delete mOgreListener;
-    mOgreListener = nullptr;
-
-    setLog(nullptr);
 }
 
 
@@ -62,20 +42,13 @@ std::string Log::getTimestamp()
     return sstr.str();
 }
 
-void Log::setLog(Ogre::Log *log)
+void Log::setLog(const std::string &name)
 {
     if(mOutfile.is_open())
         mOutfile.close();
 
-    if(mLog)
-        mLog->removeListener(mOgreListener);
-    mLog = log;
-    if(mLog)
-    {
-        mLog->addListener(mOgreListener);
-        mOutfile.open(mLog->getName());
-        mOutfile<< getTimestamp()<<"--- Starting log ---" <<std::endl;
-    }
+    mOutfile.open(name.c_str());
+    mOutfile<< getTimestamp()<<"--- Starting log ---" <<std::endl;
 }
 
 void Log::setGuiIface(GuiIface *iface)

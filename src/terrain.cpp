@@ -1,9 +1,9 @@
 
 #include "terrain.hpp"
 
-#include <OgreRoot.h>
-#include <OgreLogManager.h>
-#include <OgreCamera.h>
+#include <osg/Image>
+#include <osg/Texture2D>
+#include <osgDB/ReadFile>
 
 #include "noiseutils/noiseutils.h"
 
@@ -20,19 +20,23 @@ namespace TK
 class ImageSrcModule : public noise::module::Module
 {
 protected:
-    Ogre::Image mImage;
+    osg::ref_ptr<osg::Image> mImage;
     double mFrequency;
 
 public:
     ImageSrcModule()
       : noise::module::Module(0), mFrequency(1.0)
     { }
+    virtual ~ImageSrcModule() { }
+
+    // Sets the source Image object.
+    void SetImage(osg::Image *image) { mImage = image; }
 
     // Retrieves the source Image object.
-    Ogre::Image &GetImage() { return mImage; }
+    osg::Image *GetImage() { return mImage.get(); }
 
     // Retrieves the source Image object.
-    const Ogre::Image &GetImage() const { return mImage; }
+    const osg::Image *GetImage() const { return mImage.get(); }
 
     // Sets the number of samples per unit (default=1). Higher values
     // effectively shrink the image.
@@ -50,8 +54,8 @@ public:
 
     virtual double GetValue(double x, double /*y*/, double z) const
     {
-        const size_t width = mImage.getWidth();
-        const size_t height = mImage.getHeight();
+        const size_t width = mImage->s();
+        const size_t height = mImage->t();
 
         // NOTE: X is west/east and Z is north/south (Y is up/down, but we
         // don't bother with depth)
@@ -62,15 +66,15 @@ public:
         x += width/2.0;
         z += height/2.0;
 
-        x = Ogre::Math::Clamp<double>(x, 0.0, width-1);
-        z = Ogre::Math::Clamp<double>(z, 0.0, height-1);
+        x = std::min<double>(std::max(x, 0.0), width-1);
+        z = std::min<double>(std::max(z, 0.0), height-1);
 
         size_t sx = size_t(x);
         size_t sy = size_t(z);
 
         // The components are normalized to 0...1, while libnoise expects -1...+1.
-        Ogre::ColourValue clr = mImage.getColourAt(sx, sy, 0);
-        return clr.r*2.0 - 1.0;
+        osg::Vec4 clr = mImage->getColor(sx, sy);
+        return clr.r()*2.0 - 1.0;
     }
 };
 
@@ -82,14 +86,14 @@ public:
 
     virtual double GetValue(double x, double /*y*/, double z) const
     {
-        size_t width = mImage.getWidth();
-        size_t height = mImage.getHeight();
+        size_t width = mImage->s();
+        size_t height = mImage->t();
 
         x = x*mFrequency + width/2.0;
         z = z*mFrequency + height/2.0;
 
-        x = Ogre::Math::Clamp<double>(x, 0.0, width-1);
-        z = Ogre::Math::Clamp<double>(z, 0.0, height-1);
+        x = std::min<double>(std::max(x, 0.0), width-1);
+        z = std::min<double>(std::max(z, 0.0), height-1);
 
         size_t sx = size_t(x);
         size_t sy = size_t(z);
@@ -103,12 +107,12 @@ public:
         float b11 = (    x) * (    z);
 
         // Bilinear interpolate using the four nearest colors
-        Ogre::ColourValue clr00 = mImage.getColourAt(sx, sy, 0);
-        Ogre::ColourValue clr01 = mImage.getColourAt(std::min(sx+1, width-1), sy, 0);
-        Ogre::ColourValue clr10 = mImage.getColourAt(sx, std::min(sy+1,height-1), 0);
-        Ogre::ColourValue clr11 = mImage.getColourAt(std::min(sx+1, width-1), std::min(sy+1,height-1), 0);
+        osg::Vec4 clr00 = mImage->getColor(sx, sy);
+        osg::Vec4 clr01 = mImage->getColor(std::min(sx+1, width-1), sy);
+        osg::Vec4 clr10 = mImage->getColor(sx, std::min(sy+1,height-1));
+        osg::Vec4 clr11 = mImage->getColor(std::min(sx+1, width-1), std::min(sy+1,height-1));
         // The components are normalized to 0...1, while libnoise expects -1...+1.
-        return (clr00.r*b00 + clr01.r*b01 + clr10.r*b10 + clr11.r*b11)*2.0 - 1.0;
+        return (clr00.r()*b00 + clr01.r()*b01 + clr10.r()*b10 + clr11.r()*b11)*2.0 - 1.0;
     }
 };
 
@@ -135,19 +139,21 @@ public:
 
     virtual void getBounds(float& minX, float& maxX, float& minY, float& maxY);
 
-    virtual bool getMinMaxHeights(float size, const Ogre::Vector2 &center, float& min, float& max);
+    virtual bool getMinMaxHeights(float size, const osg::Vec2f &center, float& min, float& max);
 
-    virtual void fillVertexBuffers(int lodLevel, float size, const Ogre::Vector2 &center, Terrain::Alignment align,
-                                   std::vector<float> &positions, std::vector<float> &normals,
-                                   std::vector<Ogre::uint8> &colours);
+    virtual void fillVertexBuffers(int lodLevel, float size, const osg::Vec2f &center, Terrain::Alignment align,
+                                   std::vector<osg::Vec3f> &positions, std::vector<osg::Vec3f> &normals,
+                                   std::vector<osg::Vec4ub> &colours);
 
-    virtual void getBlendmaps(float chunkSize, const Ogre::Vector2 &chunkCenter, bool pack,
-                              std::vector<Ogre::PixelBox> &blendmaps,
+    virtual void getBlendmaps(float chunkSize, const osg::Vec2f &chunkCenter, bool pack,
+                              std::vector<osg::ref_ptr<osg::Image>> &blendmaps,
                               std::vector<Terrain::LayerInfo> &layerList);
 
     virtual void getBlendmaps(const std::vector<Terrain::QuadTreeNode*> &nodes, std::vector<Terrain::LayerCollection> &out, bool pack);
 
-    virtual float getHeightAt(const Ogre::Vector3 &worldPos);
+    virtual osg::Texture2D *getTextureImage(const std::string &name);
+
+    virtual float getHeightAt(const osg::Vec3f &worldPos);
 
     virtual Terrain::LayerInfo getDefaultLayer()
     {
@@ -161,8 +167,8 @@ public:
 
 TerrainStorage::TerrainStorage()
 {
-    mHeightmapModule.GetImage().load("tk-heightmap.png", "Terrain");
-    mHeightmapModule.GetImage().flipAroundX();
+    mHeightmapModule.SetImage(osgDB::readImageFile("terrain/tk-heightmap.png"));
+    mHeightmapModule.GetImage()->flipVertical();
     mHeightmapModule.SetFrequency(32.0);
 
     float fields_base = 16.0f/255.0f * 2.0f - 1.0f;
@@ -187,22 +193,22 @@ TerrainStorage::TerrainStorage()
 
 void TerrainStorage::getBounds(float& minX, float& maxX, float& minY, float& maxY)
 {
-    minX = -(int)mHeightmapModule.GetImage().getWidth()/2;
-    minY = -(int)mHeightmapModule.GetImage().getHeight()/2;
-    maxX =  mHeightmapModule.GetImage().getWidth()/2;
-    maxY =  mHeightmapModule.GetImage().getHeight()/2;
+    minX = -(int)mHeightmapModule.GetImage()->s()/2;
+    minY = -(int)mHeightmapModule.GetImage()->t()/2;
+    maxX =  mHeightmapModule.GetImage()->s()/2;
+    maxY =  mHeightmapModule.GetImage()->t()/2;
 }
 
-bool TerrainStorage::getMinMaxHeights(float /*size*/, const Ogre::Vector2& /*center*/, float& min, float& max)
+bool TerrainStorage::getMinMaxHeights(float /*size*/, const osg::Vec2f& /*center*/, float& min, float& max)
 {
     min = -TERRAIN_WORLD_HEIGHT*2.0f;
     max =  TERRAIN_WORLD_HEIGHT*2.0f;
     return true;
 }
 
-void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vector2& center, Terrain::Alignment align,
-                                       std::vector<float>& positions, std::vector<float>& normals,
-                                       std::vector<Ogre::uint8>& colours)
+void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const osg::Vec2f& center, Terrain::Alignment align,
+                                       std::vector<osg::Vec3f>& positions, std::vector<osg::Vec3f>& normals,
+                                       std::vector<osg::Vec4ub>& colours)
 {
     assert(size == 1<<lodLevel);
 
@@ -214,8 +220,8 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
     // We need an extra rows and columns on the sides to calculate proper normals
     builder.SetDestSize(TERRAIN_SIZE+2, TERRAIN_SIZE+2);
     builder.SetBounds(
-        center.x-(size/2.0f) - cell_vtx, center.x+(size/2.0f) + 2.0f*cell_vtx,
-        center.y-(size/2.0f) - cell_vtx, center.y+(size/2.0f) + 2.0f*cell_vtx
+        center.x()-(size/2.0f) - cell_vtx, center.x()+(size/2.0f) + 2.0f*cell_vtx,
+        center.y()-(size/2.0f) - cell_vtx, center.y()+(size/2.0f) + 2.0f*cell_vtx
     );
     builder.Build();
 
@@ -226,9 +232,9 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
     normrender.SetDestImage(normalmap);
     normrender.Render();
 
-    positions.resize(TERRAIN_SIZE*TERRAIN_SIZE * 3);
-    normals.resize(TERRAIN_SIZE*TERRAIN_SIZE * 3);
-    colours.resize(TERRAIN_SIZE*TERRAIN_SIZE * 4);
+    positions.resize(TERRAIN_SIZE*TERRAIN_SIZE);
+    normals.resize(TERRAIN_SIZE*TERRAIN_SIZE);
+    colours.resize(TERRAIN_SIZE*TERRAIN_SIZE);
 
     for(int py = 0;py < TERRAIN_SIZE;++py)
     {
@@ -238,32 +244,26 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const Ogre::Vec
         {
             size_t idx = (px*TERRAIN_SIZE) + py;
 
-            positions[idx*3 + 0] = (px/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
-            positions[idx*3 + 1] = (py/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
-            positions[idx*3 + 2] = src[px] * TERRAIN_WORLD_HEIGHT;
-            Terrain::convertPosition(align, positions[idx*3 + 0], positions[idx*3 + 1], positions[idx*3 + 2]);
+            positions[idx][0] = (px/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
+            positions[idx][1] = (py/float(TERRAIN_SIZE-1) - 0.5f) * size * TERRAIN_WORLD_SIZE;
+            positions[idx][2] = src[px] * TERRAIN_WORLD_HEIGHT;
+            Terrain::convertPosition(align, positions[idx][0], positions[idx][1], positions[idx][2]);
 
-            normals[idx*3 + 0] = norms[px].red/127.5f - 1.0f;
-            normals[idx*3 + 1] = norms[px].green/127.5f - 1.0f;
-            normals[idx*3 + 2] = norms[px].blue/127.5f - 1.0f;
-            Terrain::convertPosition(align, normals[idx*3 + 0], normals[idx*3 + 1], normals[idx*3 + 2]);
+            normals[idx][0] = norms[px].red/127.5f - 1.0f;
+            normals[idx][1] = norms[px].green/127.5f - 1.0f;
+            normals[idx][2] = norms[px].blue/127.5f - 1.0f;
+            Terrain::convertPosition(align, normals[idx][0], normals[idx][1], normals[idx][2]);
 
-            Ogre::ColourValue col(1.0f, 1.0f, 1.0f, 1.0f);
-            union {
-                Ogre::uint32 val32;
-                Ogre::uint8 val8[4];
-            } cvt_clr;
-            Ogre::Root::getSingleton().getRenderSystem()->convertColourValue(col, &cvt_clr.val32);
-            colours[idx*4 + 0] = cvt_clr.val8[0];
-            colours[idx*4 + 1] = cvt_clr.val8[1];
-            colours[idx*4 + 2] = cvt_clr.val8[2];
-            colours[idx*4 + 3] = cvt_clr.val8[3];
+            colours[idx][0] = 255;
+            colours[idx][1] = 255;
+            colours[idx][2] = 255;
+            colours[idx][3] = 255;
         }
     }
 }
 
-void TerrainStorage::getBlendmaps(float chunkSize, const Ogre::Vector2& chunkCenter, bool pack,
-                                  std::vector<Ogre::PixelBox>& blendmaps,
+void TerrainStorage::getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, bool pack,
+                                  std::vector<osg::ref_ptr<osg::Image>>& blendmaps,
                                   std::vector<Terrain::LayerInfo>& layerList)
 {
     layerList.push_back(Terrain::LayerInfo{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", false, false});
@@ -282,25 +282,36 @@ void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nod
     }
 }
 
-float TerrainStorage::getHeightAt(const Ogre::Vector3 &worldPos)
+osg::Texture2D *TerrainStorage::getTextureImage(const std::string &name)
 {
-    float val = mFinalTerrain.GetValue(worldPos.x / TERRAIN_WORLD_SIZE, 0.0f, worldPos.z / -TERRAIN_WORLD_SIZE);
+    static std::map<std::string,osg::ref_ptr<osg::Texture2D>> sTextureList;
+    auto iter = sTextureList.find(name);
+    if(iter != sTextureList.end())
+        return iter->second.get();
+
+    osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(osgDB::readImageFile(name));
+    if(!tex.valid()) return nullptr;
+    sTextureList.insert(std::make_pair(name, tex));
+    return tex.release();
+}
+
+float TerrainStorage::getHeightAt(const osg::Vec3f &worldPos)
+{
+    float val = mFinalTerrain.GetValue(worldPos.x() / TERRAIN_WORLD_SIZE, 0.0f, worldPos.z() / -TERRAIN_WORLD_SIZE);
     return val * TERRAIN_WORLD_HEIGHT;
 }
 
 
 
-void World::initialize(Ogre::Camera *camera, Ogre::Light *l)
+void World::initialize(osgViewer::Viewer *viewer, const osg::Vec3f &cameraPos)
 {
-    Ogre::SceneManager *sceneMgr = camera->getSceneManager();
-
-    mTerrain = new Terrain::DefaultWorld(sceneMgr, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
+    mTerrain = new Terrain::DefaultWorld(viewer, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
     mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
                              false/*Settings::Manager::getBool("split", "Shadows")*/);
-    mTerrain->update(camera->getRealPosition());
+    mTerrain->update(cameraPos);
     mTerrain->syncLoad();
     // need to update again so the chunks that were just loaded can be made visible
-    mTerrain->update(camera->getRealPosition());
+    mTerrain->update(cameraPos);
 }
 
 void World::deinitialize()
@@ -310,12 +321,18 @@ void World::deinitialize()
 }
 
 
-float World::getHeightAt(const Ogre::Vector3 &pos) const
+void World::rebuildCompositeMaps()
+{
+    mTerrain->rebuildCompositeMaps();
+}
+
+
+float World::getHeightAt(const osg::Vec3f &pos) const
 {
     return mTerrain->getHeightAt(pos);
 }
 
-void World::update(const Ogre::Vector3 &cameraPos)
+void World::update(const osg::Vec3f &cameraPos)
 {
     mTerrain->update(cameraPos);
 }

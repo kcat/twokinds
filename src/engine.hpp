@@ -6,6 +6,7 @@
 
 #include <osg/ref_ptr>
 #include <osg/Vec3f>
+#include <osg/Quat>
 
 struct SDL_Window;
 struct SDL_WindowEvent;
@@ -39,6 +40,7 @@ class Engine
     bool mDisplayDebugStats;
 
     osg::ref_ptr<osg::Camera> mCamera;
+    osg::Quat mCameraRot;
     osg::Vec3f mCameraPos;
 
     const CommandFuncMap mCommandFuncs;
@@ -50,6 +52,7 @@ class Engine
     void toggleBoundingBoxCmd(const std::string &value);
     void toggleDebugDisplayCmd(const std::string &value);
     void saveCfgCmd(const std::string &value);
+    void rebuildCompositeMapsCmd(const std::string &value);
     void internalCommand(const std::string &key, const std::string &value);
 
 public:

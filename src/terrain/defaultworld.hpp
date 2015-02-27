@@ -1,15 +1,17 @@
 #ifndef COMPONENTS_TERRAIN_H
 #define COMPONENTS_TERRAIN_H
 
-#include <OgreAxisAlignedBox.h>
-#include <OgreTexture.h>
-#include <OgreWorkQueue.h>
+#include <vector>
 
 #include "world.hpp"
 
-namespace Ogre
+namespace osg
 {
-    class Camera;
+    class Vec3f;
+    class Vec4ub;
+    class Texture2D;
+    class Group;
+    class Geode;
 }
 
 namespace Terrain
@@ -25,7 +27,7 @@ namespace Terrain
      *        Cracks at LOD transitions are avoided using stitching.
      * @note  Multiple cameras are not supported yet
      */
-    class DefaultWorld : public World, public Ogre::WorkQueue::RequestHandler, public Ogre::WorkQueue::ResponseHandler
+    class DefaultWorld : public World
     {
     public:
         /// @note takes ownership of \a storage
@@ -36,19 +38,20 @@ namespace Terrain
         ///         faster so this is just here for compatibility.
         /// @param align The align of the terrain, see Alignment enum
         /// @param maxBatchSize Maximum size of a terrain batch along one side (in cell units). Used when traversing the quad tree.
-        DefaultWorld(Ogre::SceneManager* sceneMgr,
-                Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize);
+        DefaultWorld(osgViewer::Viewer *viewer, Storage* storage,
+                     int visibilityFlags, bool shaders, Alignment align,
+                     int maxBatchSize);
         ~DefaultWorld();
 
         /// Update chunk LODs according to this camera position
         /// @note Calling this method might lead to composite textures being rendered, so it is best
         /// not to call it when render commands are still queued, since that would cause a flush.
-        virtual void update (const Ogre::Vector3& cameraPos);
+        virtual void update (const osg::Vec3f& cameraPos);
 
         /// Get the world bounding box of a chunk of terrain centered at \a center
-        virtual Ogre::AxisAlignedBox getWorldBoundingBox (const Ogre::Vector2& center);
+        virtual osg::BoundingBoxf getWorldBoundingBox (const osg::Vec2f& center);
 
-        Ogre::SceneNode* getRootSceneNode() { return mRootSceneNode; }
+        osg::Group *getRootSceneNode() { return mRootSceneNode.get(); }
 
         /// Show or hide the whole terrain
         /// @note this setting will be invalidated once you call Terrain::update, so do not call it while the terrain should be hidden
@@ -61,6 +64,8 @@ namespace Terrain
         /// textures, and to properly respond to this we may need to change the structure of the material, such as
         /// adding or removing passes. This can only be achieved by a full rebuild.)
         virtual void applyMaterials(bool shadows, bool splitShadows);
+
+        virtual void rebuildCompositeMaps();
 
         int getMaxBatchSize() const { return mMaxBatchSize; }
 
@@ -76,15 +81,15 @@ namespace Terrain
 
     private:
         // Called from a background worker thread
-        virtual Ogre::WorkQueue::Response* handleRequest(const Ogre::WorkQueue::Request* req, const Ogre::WorkQueue* srcQ);
+        //virtual Ogre::WorkQueue::Response* handleRequest(const Ogre::WorkQueue::Request* req, const Ogre::WorkQueue* srcQ);
         // Called from the main thread
-        virtual void handleResponse(const Ogre::WorkQueue::Response* res, const Ogre::WorkQueue* srcQ);
-        Ogre::uint16 mWorkQueueChannel;
+        //virtual void handleResponse(const Ogre::WorkQueue::Response* res, const Ogre::WorkQueue* srcQ);
+        //Ogre::uint16 mWorkQueueChannel;
 
         bool mVisible;
 
         QuadTreeNode* mRootNode;
-        Ogre::SceneNode* mRootSceneNode;
+        osg::ref_ptr<osg::Group> mRootSceneNode;
 
         /// The number of chunks currently loading in a background thread. If 0, we have finished loading!
         int mChunksLoading;
@@ -92,7 +97,11 @@ namespace Terrain
         /// The number of layer data requests. This is done when new QuadTreeNodes are created (but in a background thread)
         int mLayersLoading;
 
-        Ogre::SceneManager* mCompositeMapSceneMgr;
+        //Ogre::SceneManager* mCompositeMapSceneMgr;
+        osg::ref_ptr<osg::Group> mCompositorRootSceneNode;
+        bool mCompositorRan;
+
+        bool mUpdateIndexBuffers;
 
         /// Bounds in cell units
         float mMinX, mMaxX, mMinY, mMaxY;
@@ -100,28 +109,23 @@ namespace Terrain
         /// Maximum size of a terrain batch along one side (in cell units)
         int mMaxBatchSize;
 
-        /// Reusable nodes
-        std::vector<QuadTreeNode*> mFreeNodes;
-
     public:
         // ----INTERNAL----
-        Ogre::SceneManager* getCompositeMapSceneManager() { return mCompositeMapSceneMgr; }
+        //Ogre::SceneManager* getCompositeMapSceneManager() { return mCompositeMapSceneMgr; }
 
-        // Delete all quads
-        void clearCompositeMapSceneManager();
-        void renderCompositeMap (Ogre::TexturePtr target);
+        void renderCompositeMap(osg::Texture2D *target, osg::Geode *geode);
+        void setCompositorRan() { mCompositorRan = true; }
 
-        void freeNode(QuadTreeNode *node);
-        QuadTreeNode *createNode(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent);
+        void setUpdateIndexBuffers() { mUpdateIndexBuffers = true; }
 
         // Adds a WorkQueue request to load a chunk for this node in the background.
-        void queueChunkLoad (QuadTreeNode* node);
+        void queueChunkLoad(QuadTreeNode* node);
         // Adds a WorkQueue request to load layers for this node in the background.
-        void queueLayerLoad (QuadTreeNode* leafs);
+        void queueLayerLoad(QuadTreeNode* leaf);
 
     private:
-        Ogre::RenderTarget* mCompositeMapRenderTarget;
-        Ogre::TexturePtr mCompositeMapRenderTexture;
+        //Ogre::RenderTarget* mCompositeMapRenderTarget;
+        //Ogre::TexturePtr mCompositeMapRenderTexture;
     };
 
     struct LoadRequestData
@@ -134,9 +138,9 @@ namespace Terrain
 
     struct LoadResponseData
     {
-        std::vector<float> mPositions;
-        std::vector<float> mNormals;
-        std::vector<Ogre::uint8> mColours;
+        std::vector<osg::Vec3f> mPositions;
+        std::vector<osg::Vec3f> mNormals;
+        std::vector<osg::Vec4ub> mColours;
 
         friend std::ostream& operator<<(std::ostream& o, const LoadResponseData& r)
         { return o; }
@@ -154,7 +158,7 @@ namespace Terrain
     struct LayerResponseData
     {
         // Since we can't create a texture from a different thread, this only holds the raw texel data
-        std::vector<Ogre::PixelBox> mBlendmaps;
+        std::vector<osg::ref_ptr<osg::Image>> mBlendmaps;
         std::vector<LayerInfo> mLayers;
 
         friend std::ostream& operator<<(std::ostream& o, const LayerResponseData& r)

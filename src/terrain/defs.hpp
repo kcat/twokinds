@@ -1,6 +1,16 @@
 #ifndef COMPONENTS_TERRAIN_DEFS_HPP
 #define COMPONENTS_TERRAIN_DEFS_HPP
 
+#include <vector>
+#include <string>
+
+#include <osg/ref_ptr>
+
+namespace osg
+{
+    class Image;
+}
+
 namespace Terrain
 {
     class QuadTreeNode;
@@ -66,7 +76,7 @@ namespace Terrain
     {
         QuadTreeNode* mTarget;
         // Since we can't create a texture from a different thread, this only holds the raw texel data
-        std::vector<Ogre::PixelBox> mBlendmaps;
+        std::vector<osg::ref_ptr<osg::Image>> mBlendmaps;
         std::vector<LayerInfo> mLayers;
     };
 }

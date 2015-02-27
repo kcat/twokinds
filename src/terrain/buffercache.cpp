@@ -1,14 +1,35 @@
 #include "buffercache.hpp"
 
-#include <OgreHardwareBufferManager.h>
+#include <cassert>
+
+#include <osg/BufferObject>
+#include <osg/PrimitiveSet>
+#include <osg/Array>
 
 #include "defs.hpp"
 
 namespace
 {
 
-template <typename IndexType>
-Ogre::HardwareIndexBufferSharedPtr createIndexBuffer(unsigned int flags, unsigned int verts, Ogre::HardwareIndexBuffer::IndexType type)
+template<typename IndexType>
+struct ArrayType {
+    typedef void type;
+};
+template<>
+struct ArrayType<GLubyte> {
+    typedef osg::DrawElementsUByte type;
+};
+template<>
+struct ArrayType<GLushort> {
+    typedef osg::DrawElementsUShort type;
+};
+template<>
+struct ArrayType<GLuint> {
+    typedef osg::DrawElementsUInt type;
+};
+
+template<typename IndexType>
+osg::PrimitiveSet *createIndexBuffer(unsigned int flags, unsigned int verts)
 {
     // LOD level n means every 2^n-th vertex is kept
     size_t lodLevel = (flags >> (4*4));
@@ -151,11 +172,9 @@ Ogre::HardwareIndexBufferSharedPtr createIndexBuffer(unsigned int flags, unsigne
         }
     }
 
-    Ogre::HardwareBufferManager* mgr = Ogre::HardwareBufferManager::getSingletonPtr();
-    Ogre::HardwareIndexBufferSharedPtr buffer = mgr->createIndexBuffer(type,
-                                                                       indices.size(), Ogre::HardwareBuffer::HBU_STATIC);
-    buffer->writeData(0, buffer->getSizeInBytes(), &indices[0], true);
-    return buffer;
+    return new typename ArrayType<IndexType>::type(
+        osg::PrimitiveSet::TRIANGLES, indices.size(), indices.data()
+    );
 }
 
 }
@@ -163,53 +182,49 @@ Ogre::HardwareIndexBufferSharedPtr createIndexBuffer(unsigned int flags, unsigne
 namespace Terrain
 {
 
-    Ogre::HardwareVertexBufferSharedPtr BufferCache::getUVBuffer()
+BufferCache::~BufferCache()
+{
+}
+
+osg::Vec2Array *BufferCache::getUVBuffer()
+{
+    if(mUvBuffer.valid())
+        return mUvBuffer.get();
+
+    int vertexCount = mNumVerts * mNumVerts;
+
+    mUvBuffer = new osg::Vec2Array();
+    mUvBuffer->reserveArray(vertexCount);
+    for(unsigned int col = 0;col < mNumVerts;++col)
     {
-        std::map<int,Ogre::HardwareVertexBufferSharedPtr>::const_iterator it = mUvBufferMap.find(mNumVerts);
-        if (it != mUvBufferMap.end())
-            return it->second;
-
-        int vertexCount = mNumVerts * mNumVerts;
-
-        std::vector<float> uvs;
-        uvs.reserve(vertexCount*2);
-
-        for (unsigned int col = 0; col < mNumVerts; ++col)
+        for(unsigned int row = 0;row < mNumVerts;++row)
         {
-            for (unsigned int row = 0; row < mNumVerts; ++row)
-            {
-                uvs.push_back(col / static_cast<float>(mNumVerts-1)); // U
-                uvs.push_back(row / static_cast<float>(mNumVerts-1)); // V
-            }
+            mUvBuffer->push_back(
+                osg::Vec2(col / static_cast<float>(mNumVerts-1), // U
+                          row / static_cast<float>(mNumVerts-1)) // V
+            );
         }
-
-        Ogre::HardwareBufferManager* mgr = Ogre::HardwareBufferManager::getSingletonPtr();
-        Ogre::HardwareVertexBufferSharedPtr buffer = mgr->createVertexBuffer(
-                    Ogre::VertexElement::getTypeSize(Ogre::VET_FLOAT2),
-                                                vertexCount, Ogre::HardwareBuffer::HBU_STATIC);
-
-        buffer->writeData(0, buffer->getSizeInBytes(), &uvs[0], true);
-
-        mUvBufferMap[mNumVerts] = buffer;
-        return buffer;
     }
 
-    Ogre::HardwareIndexBufferSharedPtr BufferCache::getIndexBuffer(unsigned int flags)
-    {
-        unsigned int verts = mNumVerts;
+    return mUvBuffer.get();
+}
 
-        std::map<int,Ogre::HardwareIndexBufferSharedPtr>::const_iterator it = mIndexBufferMap.find(flags);
-        if (it != mIndexBufferMap.end())
-            return it->second;
+osg::PrimitiveSet *BufferCache::getIndexBuffer(unsigned int flags)
+{
+    unsigned int verts = mNumVerts;
 
-        Ogre::HardwareIndexBufferSharedPtr buffer;
-        if (verts*verts > (0xffffu))
-            buffer = createIndexBuffer<unsigned int>(flags, verts, Ogre::HardwareIndexBuffer::IT_32BIT);
-        else
-            buffer = createIndexBuffer<unsigned short>(flags, verts, Ogre::HardwareIndexBuffer::IT_16BIT);
+    auto it = mIndexBufferMap.find(flags);
+    if(it != mIndexBufferMap.end())
+        return it->second.get();
 
-        mIndexBufferMap.insert(std::make_pair(flags, buffer));
-        return buffer;
-    }
+    osg::ref_ptr<osg::PrimitiveSet> buffer;
+    if(verts*verts > (0xffffu))
+        buffer = createIndexBuffer<unsigned int>(flags, verts);
+    else
+        buffer = createIndexBuffer<unsigned short>(flags, verts);
+
+    mIndexBufferMap.insert(std::make_pair(flags, buffer));
+    return buffer.release();
+}
 
 }

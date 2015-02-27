@@ -6,16 +6,17 @@
 #include <sstream>
 #include <iomanip>
 
-#include <OgreLogManager.h>
 #include <OgreConfigFile.h>
-#include <OgreMath.h>
-#include <OgreMatrix3.h>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
 
 #include <osgViewer/Viewer>
+#include <osgViewer/ViewerEventHandlers>
 #include <osgDB/Registry>
+#include <osgDB/ReadFile>
+#include <osg/MatrixTransform>
+#include <osg/ShapeDrawable>
 
 #include "archives/physfs.hpp"
 #include "input/input.hpp"
@@ -29,6 +30,12 @@
 #include "render/mygui_osgrendermanager.h"
 #include "render/sdl2_osggraphicswindow.h"
 
+
+inline std::ostream& operator<<(std::ostream &out, const osg::Vec3f &vec)
+{
+    out<<"osg::Vec3f("<<vec[0]<<", "<<vec[1]<<", "<<vec[2]<<")";
+    return out;
+}
 
 namespace TK
 {
@@ -45,17 +52,14 @@ Engine::Engine(void)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
+      { "rcm", &Engine::rebuildCompositeMapsCmd },
       { "savecfg", &Engine::saveCfgCmd },
       { "tbb", &Engine::toggleBoundingBoxCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
       { "qqq", &Engine::quitCmd },
     }
 {
-    Ogre::LogManager *logMgr = OGRE_NEW Ogre::LogManager();
-    logMgr->createLog("twokinds.log", true, false, true);
-    logMgr->setLogDetail(Ogre::LL_LOW);
-
-    new Log(Log::Level_Normal, logMgr->getDefaultLog());
+    new Log(Log::Level_Normal, "twokinds.log");
 }
 
 Engine::~Engine(void)
@@ -71,9 +75,6 @@ Engine::~Engine(void)
 
     delete mInput;
     mInput = nullptr;
-
-    Log::get().setLog(nullptr);
-    OGRE_DELETE Ogre::LogManager::getSingletonPtr();
 
     if(mSDLWindow)
     {
@@ -161,23 +162,18 @@ bool Engine::pumpEvents()
             mInput->handleMouseMotionEvent(evt.motion);
             if(mGui->getMode() == Gui::Mode_Game)
             {
-                /* HACK: mouse moves the camera around */
+                /* HACK: mouse rotates the camera around */
                 static float x=0.0f, y=0.0f;
                 /* Rotation (x motion rotates around y, y motion rotates around x) */
                 x += evt.motion.yrel * 0.1f;
                 y += evt.motion.xrel * 0.1f;
                 x = std::min(std::max(x, -89.0f), 89.0f);
 
-                //Ogre::Matrix3 mat3;
-                //mat3.FromEulerAnglesZYX(Ogre::Degree(0.0f), Ogre::Degree(-y), Ogre::Degree(x));
-
-                osg::Matrixf matf;
-                matf.makeRotate(             0.0f, osg::Vec3f(0.0f, 0.0f, 1.0f),
-                               -y*3.14159f/180.0f, osg::Vec3f(0.0f, 1.0f, 0.0f),
-                                x*3.14159f/180.0f, osg::Vec3f(1.0f, 0.0f, 0.0f));
-                matf.setTrans(mCameraPos);
-
-                mCamera->setViewMatrix(matf);
+                mCameraRot.makeRotate(
+                     x*3.14159f/180.0f, osg::Vec3f(1.0f, 0.0f, 0.0f),
+                    -y*3.14159f/180.0f, osg::Vec3f(0.0f, 1.0f, 0.0f),
+                                  0.0f, osg::Vec3f(0.0f, 0.0f, 1.0f)
+                );
             }
             break;
         case SDL_MOUSEWHEEL:
@@ -214,6 +210,7 @@ void Engine::quitCmd(const std::string&)
 
 void Engine::toggleBoundingBoxCmd(const std::string&)
 {
+    Log::get().message("Cannot currently display bounding boxes");
 }
 
 void Engine::toggleDebugDisplayCmd(const std::string&)
@@ -235,6 +232,12 @@ void Engine::saveCfgCmd(const std::string &value)
     ocfg<< "[CVars]" <<std::endl;
     for(const auto &cvar : cvars)
         ocfg<< cvar.first<<" = "<<cvar.second <<std::endl;
+}
+
+void Engine::rebuildCompositeMapsCmd(const std::string&)
+{
+    Log::get().message("Rebuilding composite maps...");
+    World::get().rebuildCompositeMaps();
 }
 
 void Engine::internalCommand(const std::string &key, const std::string &value)
@@ -348,18 +351,22 @@ bool Engine::go(void)
         osg::ref_ptr<osg::GraphicsContext> gc = osg::GraphicsContext::createGraphicsContext(traits.get());
         if(!gc.valid()) throw std::runtime_error("Failed to create GraphicsContext");
 
-        mCamera = new osg::Camera;
+        mCamera = new osg::Camera();
         mCamera->setGraphicsContext(gc.get());
         mCamera->setViewport(0, 0, width, height);
-        mCamera->setClearColor(osg::Vec4(0.5f, 0.5f, 0.5f, 0.0f));
+        mCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+        mCamera->setProjectionMatrixAsPerspective(65.0f, float(width)/float(height), 1.0f, 50000.0f);
+        mCamera->setClearColor(osg::Vec4(0.25f, 0.25f, 0.25f, 0.0f));
 
         viewer = new osgViewer::Viewer();
         viewer->setCamera(mCamera.get());
     }
     SDL_ShowCursor(0);
 
-    viewer->setSceneData(new osg::Group());
+    viewer->setSceneData(new osg::MatrixTransform());
     viewer->requestContinuousUpdate();
+    viewer->setLightingMode(osg::View::NO_LIGHT);
+    viewer->addEventHandler(new osgViewer::StatsHandler);
     viewer->realize();
 
     // Setup Input subsystem
@@ -368,7 +375,7 @@ bool Engine::go(void)
 
     // Setup GUI subsystem
     Log::get().message("Initializing GUI...");
-    mGui = new Gui(viewer.get(), static_cast<osg::Group*>(viewer->getSceneData()));
+    mGui = new Gui(viewer.get(), viewer->getSceneData()->asGroup());
 
     Log::get().setGuiIface(mGui);
     for(const auto &cmd : mCommandFuncs)
@@ -376,7 +383,12 @@ bool Engine::go(void)
     CVar::registerAll();
 
     // Set up the terrain
-    //World::get().initialize(mCamera, l);
+    World::get().initialize(viewer.get(), mCameraPos);
+
+    // Frame rate tracking...
+    double last_fps_time = 0.0;
+    double last_fps = 0.0;
+    int frame_count = 0;
 
     // And away we go!
     const Uint32 base_time = SDL_GetTicks();
@@ -409,55 +421,57 @@ bool Engine::go(void)
                 movedir.z() += +1.0f;
             if(keystate[SDL_SCANCODE_D])
                 movedir.x() += +1.0f;
+            if(keystate[SDL_SCANCODE_PAGEUP])
+                movedir.y() += +1.0f;
+            if(keystate[SDL_SCANCODE_PAGEDOWN])
+                movedir.y() += -1.0f;
 
-            osg::Quat ori = mCamera->getViewMatrix().getRotate();
-            mCameraPos += (ori*movedir)*speed;
-            //pos.y = std::max(pos.y, World::get().getHeightAt(pos)+60.0f);
-            osg::Matrixf matf(ori);
-            matf.setTrans(mCameraPos);
+
+            mCameraPos += (mCameraRot*movedir)*speed;
+            mCameraPos.y() = std::max(mCameraPos.y(), World::get().getHeightAt(mCameraPos)+60.0f);
+
+            osg::Matrixf matf(mCameraRot.inverse());
+            matf.preMultTranslate(-mCameraPos);
             mCamera->setViewMatrix(matf);
+        }
+
+        World::get().update(mCameraPos);
+
+        if(frame_time-last_fps_time >= 1.0)
+        {
+            last_fps = frame_count / (frame_time-last_fps_time);
+            last_fps_time = frame_time;
+            frame_count = 0;
+        }
+
+        if(!mDisplayDebugStats)
+        {
+            if(!*vid_showfps)
+                mGui->updateStatus(std::string());
+            else
+            {
+                std::stringstream status;
+                status<< "Average FPS: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(1)<<last_fps <<std::endl;
+                mGui->updateStatus(status.str());
+            }
+        }
+        else
+        {
+            std::stringstream status;
+            status<< "Average FPS: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(1)<<last_fps <<std::endl;
+            status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<mCameraPos <<std::endl;
+            World::get().getStatus(status);
+            mGui->updateStatus(status.str());
         }
 
         viewer->frame(timediff);
         last_time = frame_time;
+        ++frame_count;
     }
 
     saveCfgCmd(std::string());
 
     return true;
 }
-
-#if 0
-bool Engine::frameStarted(const Ogre::FrameEvent &evt)
-{
-    World::get().update(mCamera->getPosition());
-    return true;
-}
-
-bool Engine::frameRenderingQueued(const Ogre::FrameEvent &evt)
-{
-    if(!mDisplayDebugStats)
-    {
-        if(!*vid_showfps)
-            mGui->updateStatus(std::string());
-        else
-        {
-            std::stringstream status;
-            status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
-            mGui->updateStatus(status.str());
-        }
-    }
-    else
-    {
-        std::stringstream status;
-        status<< "Average FPS: "<<mWindow->getAverageFPS() <<std::endl;
-        status<< "Camera pos: "<<std::setiosflags(std::ios::fixed)<<std::setprecision(2)<<mCamera->getPosition() <<std::endl;
-        World::get().getStatus(status);
-        mGui->updateStatus(status.str());
-    }
-
-    return true;
-}
-#endif
 
 } // namespace TK

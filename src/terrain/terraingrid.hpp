@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_TERRAIN_TERRAINGRID_H
 #define COMPONENTS_TERRAIN_TERRAINGRID_H
 
+#if 0
 #include "world.hpp"
 #include "material.hpp"
 
@@ -67,5 +68,6 @@ namespace Terrain
     };
 
 }
+#endif
 
 #endif

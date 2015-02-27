@@ -1,5 +1,7 @@
+
 #include "terraingrid.hpp"
 
+#if 0
 #include <OgreSceneManager.h>
 #include <OgreTextureManager.h>
 #include <OgreSceneNode.h>
@@ -163,3 +165,5 @@ void TerrainGrid::syncLoad()
 }
 
 }
+
+#endif

@@ -1,21 +1,9 @@
 [General]
-source=${DATA_ROOT}/RTShaderLib.zip
 source=${DATA_ROOT}/MyGUI_Media.zip
 source=${DATA_ROOT}
 
-[Shaders]
-path=/RTShaderLib/HLSL
-path=/RTShaderLib/GLSL150
-
-[Materials]
-path=/RTShaderLib/materials
-path=/materials/scripts
-
 [Textures]
 path=/materials/textures
-
-[Terrain]
-path=/terrain
 
 [Meshes]
 path=/meshes

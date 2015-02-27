@@ -1,14 +1,13 @@
 #include "defaultworld.hpp"
 
 #include <iostream>
+#include <cassert>
 
-#include <OgreAxisAlignedBox.h>
-#include <OgreCamera.h>
-#include <OgreHardwarePixelBuffer.h>
-#include <OgreTextureManager.h>
-#include <OgreRenderTexture.h>
-#include <OgreSceneNode.h>
-#include <OgreRoot.h>
+#include <osgViewer/Viewer>
+#include <osg/MatrixTransform>
+#include <osg/Texture2D>
+#include <osg/Depth>
+#include <osg/Material>
 
 #include "storage.hpp"
 #include "quadtreenode.hpp"
@@ -16,53 +15,65 @@
 namespace
 {
 
-    bool isPowerOfTwo(int x)
+int nextPowerOfTwo(int v)
+{
+    if(v != 0)
     {
-        return ( (x > 0) && ((x & (x - 1)) == 0) );
+        --v;
+        v |= v>>1;
+        v |= v>>2;
+        v |= v>>4;
+        v |= v>>8;
+        v |= v>>16;
     }
+    return v+1;
+}
 
-    int nextPowerOfTwo (int v)
+Terrain::QuadTreeNode* findNode (const osg::Vec2f& center, Terrain::QuadTreeNode* node)
+{
+    if(center == node->getCenter())
+        return node;
+
+    if(center.x() > node->getCenter().x() && center.y() > node->getCenter().y())
+        return findNode(center, node->getChild(Terrain::NE));
+    else if(center.x() > node->getCenter().x() && center.y() < node->getCenter().y())
+        return findNode(center, node->getChild(Terrain::SE));
+    else if(center.x() < node->getCenter().x() && center.y() > node->getCenter().y())
+        return findNode(center, node->getChild(Terrain::NW));
+    else //if(center.x() < node->getCenter().x() && center.y() < node->getCenter().y())
+        return findNode(center, node->getChild(Terrain::SW));
+}
+
+class CompositorRanCallback : public osg::Camera::DrawCallback {
+    Terrain::DefaultWorld *mTerrain;
+
+public:
+    CompositorRanCallback(Terrain::DefaultWorld *terrain)
+      : mTerrain(terrain)
+    { }
+
+    virtual void operator()(osg::RenderInfo&/*info*/) const
     {
-        if (isPowerOfTwo(v)) return v;
-        int depth=0;
-        while(v)
-        {
-            v >>= 1;
-            depth++;
-        }
-        return 1 << depth;
+        mTerrain->setCompositorRan();
     }
-
-    Terrain::QuadTreeNode* findNode (const Ogre::Vector2& center, Terrain::QuadTreeNode* node)
-    {
-        if (center == node->getCenter())
-            return node;
-
-        if (center.x > node->getCenter().x && center.y > node->getCenter().y)
-            return findNode(center, node->getChild(Terrain::NE));
-        else if (center.x > node->getCenter().x && center.y < node->getCenter().y)
-            return findNode(center, node->getChild(Terrain::SE));
-        else if (center.x < node->getCenter().x && center.y > node->getCenter().y)
-            return findNode(center, node->getChild(Terrain::NW));
-        else //if (center.x < node->getCenter().x && center.y < node->getCenter().y)
-            return findNode(center, node->getChild(Terrain::SW));
-    }
+};
 
 }
 
 namespace Terrain
 {
 
-    const Ogre::uint REQ_ID_CHUNK = 1;
-    const Ogre::uint REQ_ID_LAYER = 2;
+    //const Ogre::uint REQ_ID_CHUNK = 1;
+    //const Ogre::uint REQ_ID_LAYER = 2;
 
-    DefaultWorld::DefaultWorld(Ogre::SceneManager* sceneMgr,
+    DefaultWorld::DefaultWorld(osgViewer::Viewer *viewer,
                      Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
-        : World(sceneMgr, storage, visibilityFlags, shaders, align)
-        , mWorkQueueChannel(0)
+        : World(viewer, storage, visibilityFlags, shaders, align)
         , mVisible(true)
         , mChunksLoading(0)
         , mLayersLoading(0)
+        , mCompositorRan(false)
+        , mUpdateIndexBuffers(false)
         , mMinX(0)
         , mMaxX(0)
         , mMinY(0)
@@ -75,16 +86,37 @@ namespace Terrain
         mShaders = false;
 #endif
 
-        mCompositeMapSceneMgr = Ogre::Root::getSingleton().createSceneManager(Ogre::ST_GENERIC);
+        mRootSceneNode = new osg::Group();
+        {
+            osg::StateSet *state = mRootSceneNode->getOrCreateStateSet();
 
-        /// \todo make composite map size configurable
-        Ogre::Camera* compositeMapCam = mCompositeMapSceneMgr->createCamera("a");
-        mCompositeMapRenderTexture = Ogre::TextureManager::getSingleton().createManual(
-                    "terrain/comp/rt", Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
-            Ogre::TEX_TYPE_2D, 128, 128, 0, Ogre::PF_A8B8G8R8, Ogre::TU_RENDERTARGET);
-        mCompositeMapRenderTarget = mCompositeMapRenderTexture->getBuffer()->getRenderTarget();
-        mCompositeMapRenderTarget->setAutoUpdated(false);
-        mCompositeMapRenderTarget->addViewport(compositeMapCam);
+            state->setMode(GL_BLEND, osg::StateAttribute::OFF);
+            state->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
+            state->setAttribute(new osg::Depth(osg::Depth::LESS));
+        }
+
+        mCompositorRootSceneNode = new osg::Group();
+        {
+            osg::StateSet *state = mCompositorRootSceneNode->getOrCreateStateSet();
+
+            state->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+            state->setMode(GL_FOG, osg::StateAttribute::OFF);
+            state->setMode(GL_BLEND, osg::StateAttribute::OFF);
+            state->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+            state->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false));
+
+            osg::ref_ptr<osg::Material> glmat = new osg::Material();
+            glmat->setColorMode(osg::Material::OFF);
+            glmat->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            glmat->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            glmat->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            glmat->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            glmat->setShininess(osg::Material::FRONT_AND_BACK, 0.0f);
+            state->setAttribute(glmat.get());
+        }
+
+        mViewer->getSceneData()->asGroup()->addChild(mCompositorRootSceneNode.get());
+        mViewer->getSceneData()->asGroup()->addChild(mRootSceneNode.get());
 
         storage->getBounds(mMinX, mMaxX, mMinY, mMaxY);
 
@@ -98,62 +130,107 @@ namespace Terrain
         float centerX = (mMinX+mMaxX)/2.f + (size-origSizeX)/2.f;
         float centerY = (mMinY+mMaxY)/2.f + (size-origSizeY)/2.f;
 
-        mRootSceneNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-
-        mRootNode = new QuadTreeNode(this, Root, size, Ogre::Vector2(centerX, centerY), NULL);
-        mRootNode->initAabb();
+        mRootNode = new QuadTreeNode(this, Root, size, osg::Vec2f(centerX, centerY), nullptr);
         mRootNode->initNeighbours();
 
-        Ogre::WorkQueue* wq = Ogre::Root::getSingleton().getWorkQueue();
-        mWorkQueueChannel = wq->getChannel("LargeTerrain");
-        wq->addRequestHandler(mWorkQueueChannel, this);
-        wq->addResponseHandler(mWorkQueueChannel, this);
+        //Ogre::WorkQueue* wq = Ogre::Root::getSingleton().getWorkQueue();
+        //mWorkQueueChannel = wq->getChannel("LargeTerrain");
+        //wq->addRequestHandler(mWorkQueueChannel, this);
+        //wq->addResponseHandler(mWorkQueueChannel, this);
 
         queueLayerLoad(mRootNode);
     }
 
     DefaultWorld::~DefaultWorld()
     {
-        Ogre::WorkQueue* wq = Ogre::Root::getSingleton().getWorkQueue();
-        wq->removeRequestHandler(mWorkQueueChannel, this);
-        wq->removeResponseHandler(mWorkQueueChannel, this);
-
-        for(auto node : mFreeNodes)
-            delete node;
+        //Ogre::WorkQueue* wq = Ogre::Root::getSingleton().getWorkQueue();
+        //wq->removeRequestHandler(mWorkQueueChannel, this);
+        //wq->removeResponseHandler(mWorkQueueChannel, this);
+        if(mCompositorRootSceneNode.valid())
+        {
+            while(mCompositorRootSceneNode->getNumParents())
+                mCompositorRootSceneNode->getParent(0)->removeChild(mCompositorRootSceneNode.get());
+            mCompositorRootSceneNode = nullptr;
+        }
+        if(mRootSceneNode.valid())
+        {
+            while(mRootSceneNode->getNumParents())
+                mRootSceneNode->getParent(0)->removeChild(mRootSceneNode.get());
+            mRootSceneNode = nullptr;
+        }
 
         delete mRootNode;
     }
 
-    void DefaultWorld::update(const Ogre::Vector3& cameraPos)
+    void DefaultWorld::update(const osg::Vec3f &cameraPos)
     {
-        if (!mVisible)
-            return;
-        mRootNode->update(cameraPos);
-        mRootNode->updateIndexBuffers();
+        // FIXME: Only remove children when a render has occured (or better,
+        // make OSG auto-remove compositor cameras right after their children
+        // have finished rendering)
+        if(mCompositorRan)
+        {
+            mCompositorRan = false;
+            mCompositorRootSceneNode->removeChildren(
+                0, mCompositorRootSceneNode->getNumChildren()
+            );
+        }
+        if(!mVisible) return;
+        mRootNode->update(cameraPos, mStorage->getCellWorldSize());
+        if(mUpdateIndexBuffers)
+        {
+            mUpdateIndexBuffers = false;
+            mRootNode->updateIndexBuffers();
+        }
     }
 
-    Ogre::AxisAlignedBox DefaultWorld::getWorldBoundingBox (const Ogre::Vector2& center)
+    osg::BoundingBoxf DefaultWorld::getWorldBoundingBox(const osg::Vec2f& center)
     {
-        if (center.x > mMaxX
-                 || center.x < mMinX
-                || center.y > mMaxY
-                || center.y < mMinY)
-            return Ogre::AxisAlignedBox::BOX_NULL;
+        if(center.x() > mMaxX || center.x() < mMinX ||
+           center.y() > mMaxY || center.y() < mMinY)
+            return osg::BoundingBoxf();
         QuadTreeNode* node = findNode(center, mRootNode);
         return node->getWorldBoundingBox();
     }
 
-    void DefaultWorld::renderCompositeMap(Ogre::TexturePtr target)
+    void DefaultWorld::rebuildCompositeMaps()
     {
-        mCompositeMapRenderTarget->update();
-        target->getBuffer()->blit(mCompositeMapRenderTexture->getBuffer());
+        mRootNode->clearCompositeMaps();
+        mRootNode->applyMaterials();
     }
 
-    void DefaultWorld::clearCompositeMapSceneManager()
+    // FIXME
+    void DefaultWorld::renderCompositeMap(osg::Texture2D *target, osg::Geode *geode)
     {
-        mCompositeMapSceneMgr->destroyAllManualObjects();
-        mCompositeMapSceneMgr->clearScene();
+        const int size = 128;
+
+        target->setTextureSize(size, size);
+        target->setSourceFormat(GL_RGBA);
+        target->setSourceType(GL_UNSIGNED_BYTE);
+        target->setInternalFormat(GL_RGBA8);
+        target->setUnRefImageDataAfterApply(true);
+
+        osg::ref_ptr<osg::Camera> camera = new osg::Camera();
+        camera->setClearMask(GL_NONE);
+
+        camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+        camera->setProjectionResizePolicy(osg::Camera::FIXED);
+        camera->setProjectionMatrix(osg::Matrixd::identity());
+        camera->setViewMatrix(osg::Matrixd::identity());
+        camera->setViewport(0, 0, size, size);
+
+        camera->setRenderOrder(osg::Camera::PRE_RENDER);
+
+        camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+        camera->attach(osg::Camera::COLOR_BUFFER, target, 0, 0, true);
+
+        camera->setPostDrawCallback(new CompositorRanCallback(this));
+        mCompositorRan = false;
+
+        camera->addChild(geode);
+
+        mCompositorRootSceneNode->addChild(camera);
     }
+
 
     void DefaultWorld::applyMaterials(bool shadows, bool splitShadows)
     {
@@ -164,11 +241,10 @@ namespace Terrain
 
     void DefaultWorld::setVisible(bool visible)
     {
-        if (visible && !mVisible)
-            mSceneMgr->getRootSceneNode()->addChild(mRootSceneNode);
-        else if (!visible && mVisible)
-            mSceneMgr->getRootSceneNode()->removeChild(mRootSceneNode);
-
+        if(visible)
+            mRootSceneNode->addChild(mRootNode->getSceneNode());
+        else
+            mRootSceneNode->removeChild(mRootNode->getSceneNode());
         mVisible = visible;
     }
 
@@ -197,34 +273,20 @@ namespace Terrain
             status<<std::endl;
         }
         status<< "Total chunks: "<<totalchunks <<std::endl;
-        status<< "Loaded nodes: "<<nodes<<" ("<<mFreeNodes.size()<<" free)" <<std::endl;
+        status<< "Loaded nodes: "<<nodes <<std::endl;
     }
 
-
-    void DefaultWorld::freeNode(QuadTreeNode *node)
-    {
-        mFreeNodes.push_back(node);
-    }
-
-    QuadTreeNode *DefaultWorld::createNode(ChildDirection dir, int size, const Ogre::Vector2& center, QuadTreeNode* parent)
-    {
-        if(mFreeNodes.empty())
-            return new QuadTreeNode(this, dir, size, center, parent);
-        QuadTreeNode *node = mFreeNodes.back();
-        node->reset(dir, size, center, parent);
-        mFreeNodes.pop_back();
-        return node;
-    }
 
     void DefaultWorld::syncLoad()
     {
-        while (mChunksLoading || mLayersLoading)
-        {
-            OGRE_THREAD_SLEEP(0);
-            Ogre::Root::getSingleton().getWorkQueue()->processResponses();
-        }
+        //while (mChunksLoading || mLayersLoading)
+        //{
+        //    OGRE_THREAD_SLEEP(0);
+        //    Ogre::Root::getSingleton().getWorkQueue()->processResponses();
+        //}
     }
 
+#if 0 // FIXME
     Ogre::WorkQueue::Response* DefaultWorld::handleRequest(const Ogre::WorkQueue::Request *req, const Ogre::WorkQueue *srcQ)
     {
         if (req->getType() == REQ_ID_CHUNK)
@@ -277,23 +339,31 @@ namespace Terrain
             --mLayersLoading;
         }
     }
+#endif
 
     void DefaultWorld::queueChunkLoad(QuadTreeNode *node)
     {
-        LoadRequestData data;
-        data.mNode = node;
+        LoadResponseData responseData;
 
-        Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_CHUNK, Ogre::Any(data));
         ++mChunksLoading;
+        getStorage()->fillVertexBuffers(
+            node->getNativeLodLevel(), node->getSize(), node->getCenter(), getAlign(),
+            responseData.mPositions, responseData.mNormals, responseData.mColours
+        );
+
+        node->load(responseData);
+        --mChunksLoading;
     }
 
     void DefaultWorld::queueLayerLoad(QuadTreeNode *node)
     {
-        LayerRequestData data;
-        data.mNode = node;
-        data.mPack = getShadersEnabled();
+        LayerResponseData responseData;
 
-        Ogre::Root::getSingleton().getWorkQueue()->addRequest(mWorkQueueChannel, REQ_ID_LAYER, Ogre::Any(data));
         ++mLayersLoading;
+        getStorage()->getBlendmaps(node->getSize(), node->getCenter(), getShadersEnabled(),
+                                   responseData.mBlendmaps, responseData.mLayers);
+
+        node->loadLayers(responseData.mBlendmaps, responseData.mLayers);
+        --mLayersLoading;
     }
 }

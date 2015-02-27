@@ -9,12 +9,6 @@
 #include "singleton.hpp"
 
 
-namespace Ogre
-{
-    class Log;
-}
-
-
 namespace TK
 {
 
@@ -31,22 +25,18 @@ public:
     };
 
 private:
-    class OgreListener;
-
     Level mLevel;
     GuiIface *mGui;
     std::vector<std::string> mBuffer;
     std::ofstream mOutfile;
-    Ogre::Log *mLog;
-    OgreListener *mOgreListener;
 
     static std::string getTimestamp();
 
 public:
-    Log(Level level=Level_Normal, Ogre::Log *log=nullptr);
+    Log(Level level=Level_Normal, const std::string &name=std::string());
     virtual ~Log();
 
-    void setLog(Ogre::Log *log);
+    void setLog(const std::string &name);
     void setLevel(Level level) { mLevel = level; }
     Level getLevel() const { return mLevel; }
 

@@ -3,11 +3,14 @@
 
 #include <iostream>
 
-namespace Ogre
+namespace osg
 {
-    class Vector3;
-    class Camera;
-    class Light;
+    class Vec3f;
+}
+
+namespace osgViewer
+{
+    class Viewer;
 }
 
 namespace Terrain
@@ -28,11 +31,13 @@ class World
 
     World();
 public:
-    void initialize(Ogre::Camera *camera, Ogre::Light *l);
+    void initialize(osgViewer::Viewer *viewer, const osg::Vec3f &cameraPos);
     void deinitialize();
 
-    float getHeightAt(const Ogre::Vector3 &pos) const;
-    void update(const Ogre::Vector3 &cameraPos);
+    void rebuildCompositeMaps();
+
+    float getHeightAt(const osg::Vec3f &pos) const;
+    void update(const osg::Vec3f &cameraPos);
 
     void getStatus(std::ostream &status) const;
 
