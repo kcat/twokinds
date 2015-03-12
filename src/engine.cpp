@@ -70,6 +70,7 @@ Engine::~Engine(void)
 
     World::get().deinitialize();
 
+    mSceneRoot = nullptr;
     mCamera = nullptr;
 
     Log::get().setGuiIface(nullptr);
@@ -375,13 +376,13 @@ bool Engine::go(void)
     }
     SDL_ShowCursor(0);
 
-    osg::ref_ptr<osg::MatrixTransform> sceneRoot = new osg::MatrixTransform();
+    mSceneRoot = new osg::Group();
 
     {
         int screen_width = mCamera->getViewport()->width();
         int screen_height = mCamera->getViewport()->height();
         Pipeline *pipeline = new Pipeline(screen_width, screen_height);
-        pipeline->init(sceneRoot);
+        pipeline->init(mSceneRoot.get());
         pipeline->setProjectionMatrix(osg::Matrix::perspective(
             65.0, double(screen_width)/double(screen_height), 1.0, 50000.0
         ));
@@ -419,7 +420,7 @@ bool Engine::go(void)
     CVar::registerAll();
 
     // Set up the terrain
-    World::get().initialize(viewer.get(), sceneRoot.get(), mCameraPos);
+    World::get().initialize(viewer.get(), mSceneRoot.get(), mCameraPos);
 
     // Frame rate tracking...
     double last_fps_time = 0.0;

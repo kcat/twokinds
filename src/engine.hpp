@@ -18,6 +18,7 @@ struct SDL_TextInputEvent;
 
 namespace osg
 {
+    class Group;
     class Camera;
 }
 
@@ -42,6 +43,9 @@ class Engine
     osg::ref_ptr<osg::Camera> mCamera;
     osg::Quat mCameraRot;
     osg::Vec3f mCameraPos;
+
+    // Root node for the world display
+    osg::ref_ptr<osg::Group> mSceneRoot;
 
     const CommandFuncMap mCommandFuncs;
 
