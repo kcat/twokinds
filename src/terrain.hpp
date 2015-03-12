@@ -6,6 +6,7 @@
 namespace osg
 {
     class Vec3f;
+    class Group;
 }
 
 namespace osgViewer
@@ -31,7 +32,7 @@ class World
 
     World();
 public:
-    void initialize(osgViewer::Viewer *viewer, const osg::Vec3f &cameraPos);
+    void initialize(osgViewer::Viewer *viewer, osg::Group *rootNode, const osg::Vec3f &cameraPos);
     void deinitialize();
 
     void rebuildCompositeMaps();

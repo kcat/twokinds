@@ -118,10 +118,17 @@ namespace
         colors->push_back(osg::Vec4ub(255, 255, 255, 255));
         colors->push_back(osg::Vec4ub(255, 255, 255, 255));
         colors->push_back(osg::Vec4ub(255, 255, 255, 255));
+        colors->setNormalize(true);
+        osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array();
+        normals->push_back(osg::Vec3(0.0f, 0.0f, 1.0f));
+        normals->push_back(osg::Vec3(0.0f, 0.0f, 1.0f));
+        normals->push_back(osg::Vec3(0.0f, 0.0f, 1.0f));
+        normals->push_back(osg::Vec3(0.0f, 0.0f, 1.0f));
 
         geom->setVertexArray(vertices.get());
-        geom->setTexCoordArray(0, texcoords.get());
-        geom->setColorArray(colors.get());
+        geom->setNormalArray(normals.get(), osg::Array::BIND_PER_VERTEX);
+        geom->setTexCoordArray(0, texcoords.get(), osg::Array::BIND_PER_VERTEX);
+        geom->setColorArray(colors.get(), osg::Array::BIND_PER_VERTEX);
         geom->addPrimitiveSet(new osg::DrawArrays(
             osg::PrimitiveSet::QUADS, 0, vertices->size()
         ));
@@ -459,9 +466,10 @@ void QuadTreeNode::load(const LoadResponseData &data)
 
     osg::ref_ptr<osg::Geometry> geom = new osg::Geometry();
     geom->setVertexArray(new osg::Vec3Array(data.mPositions.size(), data.mPositions.data()));
-    geom->setNormalArray(new osg::Vec3Array(data.mNormals.size(), data.mNormals.data()));
-    geom->setColorArray(new osg::Vec4ubArray(data.mColours.size(), data.mColours.data()));
-    geom->setTexCoordArray(0, mTerrain->getBufferCache().getUVBuffer());
+    geom->setNormalArray(new osg::Vec3Array(data.mNormals.size(), data.mNormals.data()), osg::Array::BIND_PER_VERTEX);
+    geom->setColorArray(new osg::Vec4ubArray(data.mColours.size(), data.mColours.data()), osg::Array::BIND_PER_VERTEX);
+    geom->setTexCoordArray(0, mTerrain->getBufferCache().getUVBuffer(), osg::Array::BIND_PER_VERTEX);
+    geom->getColorArray()->setNormalize(true);
     geom->addPrimitiveSet(getIndexBuffer());
     geom->setUseDisplayList(false);
     geom->setUseVertexBufferObjects(true);
@@ -487,6 +495,7 @@ void QuadTreeNode::unload()
         mGeode = nullptr;
 
         mCompositeMap = nullptr;
+        mNormalMap = nullptr;
 
         // Do *not* set this when we are still loading!
         mChunkLoadState = LS_Unloaded;
@@ -577,7 +586,7 @@ void QuadTreeNode::loadMaterials()
         else
         {
             ensureCompositeMap();
-            mGeode->setStateSet(mMaterialGenerator->generateForCompositeMap(mCompositeMap.get()));
+            mGeode->setStateSet(mMaterialGenerator->generateForCompositeMap(mCompositeMap.get(), mNormalMap.get()));
         }
     }
 }
@@ -628,11 +637,15 @@ void QuadTreeNode::ensureCompositeMap()
     mCompositeMap->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
     mCompositeMap->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 
+    mNormalMap = new osg::Texture2D();
+    mNormalMap->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+    mNormalMap->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+
     // Create quads for each cell part of this node
     osg::ref_ptr<osg::Geode> geode = new osg::Geode();
     prepareForCompositeMap(geode.get(), osg::Vec4f(0.0f, 0.0f, 1.0f, 1.0f));
     if(geode->getNumDrawables() > 0)
-        mTerrain->renderCompositeMap(mCompositeMap.get(), geode.get());
+        mTerrain->renderCompositeMap(mCompositeMap.get(), mNormalMap.get(), geode.get());
 }
 
 void QuadTreeNode::applyMaterials()
@@ -646,7 +659,7 @@ void QuadTreeNode::applyMaterials()
         else
         {
             ensureCompositeMap();
-            mGeode->setStateSet(mMaterialGenerator->generateForCompositeMap(mCompositeMap.get()));
+            mGeode->setStateSet(mMaterialGenerator->generateForCompositeMap(mCompositeMap.get(), mNormalMap.get()));
         }
     }
     if(hasChildren())

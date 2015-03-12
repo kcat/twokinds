@@ -66,26 +66,20 @@ namespace Terrain
     //const Ogre::uint REQ_ID_CHUNK = 1;
     //const Ogre::uint REQ_ID_LAYER = 2;
 
-    DefaultWorld::DefaultWorld(osgViewer::Viewer *viewer,
-                     Storage* storage, int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
-        : World(viewer, storage, visibilityFlags, shaders, align)
-        , mVisible(true)
-        , mChunksLoading(0)
-        , mLayersLoading(0)
-        , mCompositorRan(false)
-        , mUpdateIndexBuffers(false)
-        , mMinX(0)
-        , mMaxX(0)
-        , mMinY(0)
-        , mMaxY(0)
-        , mMaxBatchSize(maxBatchSize)
+    DefaultWorld::DefaultWorld(osgViewer::Viewer *viewer, osg::Group *rootNode, Storage *storage,
+                               int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
+      : World(viewer, storage, visibilityFlags, shaders, align)
+      , mVisible(true)
+      , mChunksLoading(0)
+      , mLayersLoading(0)
+      , mCompositorRan(false)
+      , mUpdateIndexBuffers(false)
+      , mMinX(0)
+      , mMaxX(0)
+      , mMinY(0)
+      , mMaxY(0)
+      , mMaxBatchSize(maxBatchSize)
     {
-#if TERRAIN_USE_SHADER == 0
-        if (mShaders)
-            std::cerr << "Compiled Terrain without shader support, disabling..." << std::endl;
-        mShaders = false;
-#endif
-
         mRootSceneNode = new osg::Group();
         {
             osg::StateSet *state = mRootSceneNode->getOrCreateStateSet();
@@ -99,24 +93,10 @@ namespace Terrain
         {
             osg::StateSet *state = mCompositorRootSceneNode->getOrCreateStateSet();
 
-            state->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-            state->setMode(GL_FOG, osg::StateAttribute::OFF);
             state->setMode(GL_BLEND, osg::StateAttribute::OFF);
             state->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
             state->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false));
-
-            osg::ref_ptr<osg::Material> glmat = new osg::Material();
-            glmat->setColorMode(osg::Material::OFF);
-            glmat->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            glmat->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
-            glmat->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            glmat->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            glmat->setShininess(osg::Material::FRONT_AND_BACK, 0.0f);
-            state->setAttribute(glmat.get());
         }
-
-        mViewer->getSceneData()->asGroup()->addChild(mCompositorRootSceneNode.get());
-        mViewer->getSceneData()->asGroup()->addChild(mRootSceneNode.get());
 
         storage->getBounds(mMinX, mMaxX, mMinY, mMaxY);
 
@@ -139,6 +119,9 @@ namespace Terrain
         //wq->addResponseHandler(mWorkQueueChannel, this);
 
         queueLayerLoad(mRootNode);
+
+        rootNode->addChild(mCompositorRootSceneNode.get());
+        rootNode->addChild(mRootSceneNode.get());
     }
 
     DefaultWorld::~DefaultWorld()
@@ -199,7 +182,7 @@ namespace Terrain
     }
 
     // FIXME
-    void DefaultWorld::renderCompositeMap(osg::Texture2D *target, osg::Geode *geode)
+    void DefaultWorld::renderCompositeMap(osg::Texture2D *target, osg::Texture2D *normal, osg::Geode *geode)
     {
         const int size = 128;
 
@@ -208,6 +191,12 @@ namespace Terrain
         target->setSourceType(GL_UNSIGNED_BYTE);
         target->setInternalFormat(GL_RGBA8);
         target->setUnRefImageDataAfterApply(true);
+
+        normal->setTextureSize(size, size);
+        normal->setSourceFormat(GL_RGBA);
+        normal->setSourceType(GL_UNSIGNED_BYTE);
+        normal->setInternalFormat(GL_RGBA8);
+        normal->setUnRefImageDataAfterApply(true);
 
         osg::ref_ptr<osg::Camera> camera = new osg::Camera();
         camera->setClearMask(GL_NONE);
@@ -221,7 +210,8 @@ namespace Terrain
         camera->setRenderOrder(osg::Camera::PRE_RENDER);
 
         camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-        camera->attach(osg::Camera::COLOR_BUFFER, target, 0, 0, true);
+        camera->attach(osg::Camera::COLOR_BUFFER0, target, 0, 0, true);
+        camera->attach(osg::Camera::COLOR_BUFFER1, normal, 0, 0, true);
 
         camera->setPostDrawCallback(new CompositorRanCallback(this));
         mCompositorRan = false;

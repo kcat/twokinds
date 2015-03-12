@@ -262,11 +262,11 @@ void TerrainStorage::fillVertexBuffers(int lodLevel, float size, const osg::Vec2
     }
 }
 
-void TerrainStorage::getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, bool pack,
+void TerrainStorage::getBlendmaps(float size, const osg::Vec2f& center, bool pack,
                                   std::vector<osg::ref_ptr<osg::Image>>& blendmaps,
                                   std::vector<Terrain::LayerInfo>& layerList)
 {
-    layerList.push_back(Terrain::LayerInfo{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", false, false});
+    layerList.push_back(Terrain::LayerInfo{"dirt_grayrocky_diffusespecular.dds","dirt_grayrocky_normalheight.dds", true, true});
 }
 
 void TerrainStorage::getBlendmaps(const std::vector<Terrain::QuadTreeNode*>& nodes, std::vector<Terrain::LayerCollection>& out, bool pack)
@@ -289,8 +289,13 @@ osg::Texture2D *TerrainStorage::getTextureImage(const std::string &name)
     if(iter != sTextureList.end())
         return iter->second.get();
 
-    osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(osgDB::readImageFile(name));
-    if(!tex.valid()) return nullptr;
+    osg::ref_ptr<osg::Image> image = osgDB::readImageFile(name);
+    if(!image.valid()) return nullptr;
+
+    osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(image.get());
+    tex->setUnRefImageDataAfterApply(true);
+    tex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+    tex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
     sTextureList.insert(std::make_pair(name, tex));
     return tex.release();
 }
@@ -303,9 +308,9 @@ float TerrainStorage::getHeightAt(const osg::Vec3f &worldPos)
 
 
 
-void World::initialize(osgViewer::Viewer *viewer, const osg::Vec3f &cameraPos)
+void World::initialize(osgViewer::Viewer *viewer, osg::Group *rootNode, const osg::Vec3f &cameraPos)
 {
-    mTerrain = new Terrain::DefaultWorld(viewer, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
+    mTerrain = new Terrain::DefaultWorld(viewer, rootNode, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
     mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
                              false/*Settings::Manager::getBool("split", "Shadows")*/);
     mTerrain->update(cameraPos);

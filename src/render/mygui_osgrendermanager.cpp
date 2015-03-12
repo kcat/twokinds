@@ -8,11 +8,11 @@
 #include <MyGUI_RenderManager.h>
 
 #include <osgViewer/Viewer>
+#include <osgDB/ReadFile>
 #include <osg/Texture2D>
-#include <osg/MatrixTransform>
 #include <osg/PolygonMode>
 #include <osg/BlendFunc>
-#include <osg/TexEnv>
+#include <osg/Depth>
 
 #include "mygui_osgvertexbuffer.h"
 #include "mygui_osgtexture.h"
@@ -64,6 +64,19 @@ public:
     META_Object(osgGA, ResizeHandler)
 };
 
+osg::StateSet *setShaderProgram(osg::Node *node, std::string vert, std::string frag)
+{
+    osg::ref_ptr<osg::Program> program = new osg::Program();
+    program->addShader(osgDB::readShaderFile(osg::Shader::VERTEX, vert));
+    program->addShader(osgDB::readShaderFile(osg::Shader::FRAGMENT, frag));
+
+    osg::StateSet *ss = node->getOrCreateStateSet();
+    ss->setAttributeAndModes(program.get(),
+        osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE
+    );
+    return ss;
+}
+
 } // namespace
 
 namespace TK
@@ -107,24 +120,8 @@ void OSGRenderManager::initialise()
     drawable->setSupportsDisplayList(false);
     drawable->setUseVertexBufferObjects(true);
     drawable->setDataVariance(osg::Object::DYNAMIC);
-    osg::StateSet *state = drawable->getOrCreateStateSet();
-    state->setTextureMode(0, GL_TEXTURE_GEN_S, osg::StateAttribute::OFF);
-    state->setTextureMode(0, GL_TEXTURE_GEN_T, osg::StateAttribute::OFF);
-    state->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::OFF);
-    state->setTextureMode(0, GL_TEXTURE_2D, osg::StateAttribute::ON);
-    state->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
-    state->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-    state->setMode(GL_LIGHT0, osg::StateAttribute::OFF);
-    state->setMode(GL_BLEND, osg::StateAttribute::ON);
-    state->setMode(GL_FOG, osg::StateAttribute::OFF);
-    state->setTextureAttribute(0, new osg::TexEnv(osg::TexEnv::MODULATE));
-    state->setAttribute(new osg::PolygonMode(osg::PolygonMode::FRONT, osg::PolygonMode::FILL));
-    state->setAttribute(new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-    state->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
-    state->setRenderBinDetails(11, "RenderBin");
 
     osg::ref_ptr<osg::Geode> geode = new osg::Geode;
-    geode->setCullingActive(false);
     geode->addDrawable(drawable.get());
 
     osg::ref_ptr<osg::Camera> camera = new osg::Camera();
@@ -134,6 +131,14 @@ void OSGRenderManager::initialise()
     camera->setViewMatrix(osg::Matrix::identity());
     camera->setRenderOrder(osg::Camera::POST_RENDER);
     camera->setClearMask(GL_NONE);
+    osg::StateSet *state = setShaderProgram(camera.get(), "shaders/quad_2d.vert", "shaders/quad_2d.frag");
+    state->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    state->setAttributeAndModes(new osg::PolygonMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL));
+    state->setAttributeAndModes(new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    state->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false));
+    state->addUniform(new osg::Uniform("TexImage", 0));
+    state->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    state->setRenderBinDetails(11, "RenderBin");
     camera->addChild(geode.get());
 
     mGuiRoot = camera;

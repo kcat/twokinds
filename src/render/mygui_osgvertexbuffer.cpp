@@ -96,6 +96,7 @@ void OSGVertexBuffer::create()
     mPositionArray = new osg::Vec3Array(mNeedVertexCount);
     mColorArray = new osg::Vec4ubArray(mNeedVertexCount);
     mTexCoordArray = new osg::Vec2Array(mNeedVertexCount);
+    mColorArray->setNormalize(true);
 
     mBuffer = new osg::VertexBufferObject;
     mBuffer->setDataVariance(osg::Object::DYNAMIC);

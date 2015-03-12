@@ -38,7 +38,7 @@ namespace Terrain
         ///         faster so this is just here for compatibility.
         /// @param align The align of the terrain, see Alignment enum
         /// @param maxBatchSize Maximum size of a terrain batch along one side (in cell units). Used when traversing the quad tree.
-        DefaultWorld(osgViewer::Viewer *viewer, Storage* storage,
+        DefaultWorld(osgViewer::Viewer *viewer, osg::Group *rootNode, Storage* storage,
                      int visibilityFlags, bool shaders, Alignment align,
                      int maxBatchSize);
         ~DefaultWorld();
@@ -113,7 +113,7 @@ namespace Terrain
         // ----INTERNAL----
         //Ogre::SceneManager* getCompositeMapSceneManager() { return mCompositeMapSceneMgr; }
 
-        void renderCompositeMap(osg::Texture2D *target, osg::Geode *geode);
+        void renderCompositeMap(osg::Texture2D *target, osg::Texture2D *normalmap, osg::Geode *geode);
         void setCompositorRan() { mCompositorRan = true; }
 
         void setUpdateIndexBuffers() { mUpdateIndexBuffers = true; }

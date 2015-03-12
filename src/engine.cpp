@@ -16,7 +16,6 @@
 #include <osgDB/Registry>
 #include <osgDB/ReadFile>
 #include <osg/MatrixTransform>
-#include <osg/ShapeDrawable>
 
 #include "archives/physfs.hpp"
 #include "input/input.hpp"
@@ -29,6 +28,7 @@
 
 #include "render/mygui_osgrendermanager.h"
 #include "render/sdl2_osggraphicswindow.h"
+#include "render/pipeline.hpp"
 
 
 inline std::ostream& operator<<(std::ostream &out, const osg::Vec3f &vec)
@@ -36,6 +36,7 @@ inline std::ostream& operator<<(std::ostream &out, const osg::Vec3f &vec)
     out<<"osg::Vec3f("<<vec[0]<<", "<<vec[1]<<", "<<vec[2]<<")";
     return out;
 }
+
 
 namespace TK
 {
@@ -56,6 +57,7 @@ Engine::Engine(void)
       { "savecfg", &Engine::saveCfgCmd },
       { "tbb", &Engine::toggleBoundingBoxCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
+      { "tm", &Engine::toggleMapsCmd },
       { "qqq", &Engine::quitCmd },
     }
 {
@@ -64,6 +66,8 @@ Engine::Engine(void)
 
 Engine::~Engine(void)
 {
+    delete Pipeline::getPtr();
+
     World::get().deinitialize();
 
     mCamera = nullptr;
@@ -218,6 +222,12 @@ void Engine::toggleDebugDisplayCmd(const std::string&)
     mDisplayDebugStats = !mDisplayDebugStats;
 }
 
+void Engine::toggleMapsCmd(const std::string&)
+{
+    Pipeline::get().toggleDebugMapDisplay();
+}
+
+
 void Engine::saveCfgCmd(const std::string &value)
 {
     static const std::string default_cfg("twokinds.cfg");
@@ -239,6 +249,7 @@ void Engine::rebuildCompositeMapsCmd(const std::string&)
     Log::get().message("Rebuilding composite maps...");
     World::get().rebuildCompositeMaps();
 }
+
 
 void Engine::internalCommand(const std::string &key, const std::string &value)
 {
@@ -350,20 +361,45 @@ bool Engine::go(void)
 
         osg::ref_ptr<osg::GraphicsContext> gc = osg::GraphicsContext::createGraphicsContext(traits.get());
         if(!gc.valid()) throw std::runtime_error("Failed to create GraphicsContext");
+        gc->getState()->setUseModelViewAndProjectionUniforms(true);
+        gc->getState()->setUseVertexAttributeAliasing(true);
 
         mCamera = new osg::Camera();
         mCamera->setGraphicsContext(gc.get());
         mCamera->setViewport(0, 0, width, height);
-        mCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-        mCamera->setProjectionMatrixAsPerspective(65.0f, float(width)/float(height), 1.0f, 50000.0f);
-        mCamera->setClearColor(osg::Vec4(0.25f, 0.25f, 0.25f, 0.0f));
+        mCamera->setProjectionResizePolicy(osg::Camera::FIXED);
+        mCamera->setProjectionMatrix(osg::Matrix::identity());
 
         viewer = new osgViewer::Viewer();
         viewer->setCamera(mCamera.get());
     }
     SDL_ShowCursor(0);
 
-    viewer->setSceneData(new osg::MatrixTransform());
+    osg::ref_ptr<osg::MatrixTransform> sceneRoot = new osg::MatrixTransform();
+
+    {
+        int screen_width = mCamera->getViewport()->width();
+        int screen_height = mCamera->getViewport()->height();
+        Pipeline *pipeline = new Pipeline(screen_width, screen_height);
+        pipeline->init(sceneRoot);
+        pipeline->setProjectionMatrix(osg::Matrix::perspective(
+            65.0, double(screen_width)/double(screen_height), 1.0, 50000.0
+        ));
+
+        // Add a light so we can see
+        osg::Vec3f lightDir(70.f, -100.f, 10.f);
+        lightDir.normalize();
+        osg::ref_ptr<osg::Node> light = pipeline->createDirectionalLight();
+        osg::StateSet *ss = light->getOrCreateStateSet();
+        ss->addUniform(new osg::Uniform("light_direction", lightDir));
+        ss->addUniform(new osg::Uniform("diffuse_color", osg::Vec4f(1.0f, 0.988f, 0.933f, 1.0f)));
+        ss->addUniform(new osg::Uniform("specular_color", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)));
+        pipeline->getLightingStateSet()->getUniform("ambient_color")->set(
+            osg::Vec4f(0.537f, 0.549f, 0.627f, 1.0f)
+        );
+    }
+
+    viewer->setSceneData(Pipeline::get().getGraphRoot());
     viewer->requestContinuousUpdate();
     viewer->setLightingMode(osg::View::NO_LIGHT);
     viewer->addEventHandler(new osgViewer::StatsHandler);
@@ -383,7 +419,7 @@ bool Engine::go(void)
     CVar::registerAll();
 
     // Set up the terrain
-    World::get().initialize(viewer.get(), mCameraPos);
+    World::get().initialize(viewer.get(), sceneRoot.get(), mCameraPos);
 
     // Frame rate tracking...
     double last_fps_time = 0.0;

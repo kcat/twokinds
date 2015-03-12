@@ -101,6 +101,7 @@ set(HDRS src/archives/physfs.hpp
          src/render/mygui_osgvertexbuffer.h
          src/render/mygui_osgtexture.h
          src/render/sdl2_osggraphicswindow.h
+         src/render/pipeline.hpp
          src/input/iface.hpp
          src/input/input.hpp
          src/gui/iface.hpp
@@ -129,6 +130,7 @@ set(SRCS src/archives/physfs.cpp
          src/render/mygui_osgvertexbuffer.cpp
          src/render/mygui_osgtexture.cpp
          src/render/sdl2_osggraphicswindow.cpp
+         src/render/pipeline.cpp
          src/input/input.cpp
          src/gui/gui.cpp
          src/terrain/buffercache.cpp

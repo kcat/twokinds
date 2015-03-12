@@ -15,6 +15,8 @@ namespace osg
 namespace Terrain
 {
 
+class LayerIdentifier;
+
 class MaterialGenerator
 {
 public:
@@ -31,18 +33,18 @@ public:
     void enableParallaxMapping(bool parallaxMapping) { mParallaxMapping = parallaxMapping; }
     void enableSplitShadows(bool splitShadows) { mSplitShadows = splitShadows; }
 
-    /// Creates a material suitable for displaying a chunk of terrain using alpha-blending.
+    /// Creates a StateSet suitable for displaying a chunk of terrain.
     osg::StateSet *generate();
 
-    /// Creates a material suitable for displaying a chunk of terrain using a ready-made composite map.
-    osg::StateSet *generateForCompositeMap(osg::Texture2D *compositeMap);
+    /// Creates a StateSet suitable for displaying a chunk of terrain using a ready-made composite map and normal map.
+    osg::StateSet *generateForCompositeMap(osg::Texture2D *compositeMap, osg::Texture2D *normalMap);
 
-    /// Creates a material suitable for rendering composite maps, i.e. for "baking" several layer textures
-    /// into one. The main difference compared to a normal material is that no shading is applied at this point.
+    /// Creates a StateSet suitable for rendering composite maps, i.e. for "baking" several layer textures
+    /// into one. The main difference compared to a normal StateSet is that no shading is applied at this point.
     osg::StateSet *generateForCompositeMapRTT(int lodLevel);
 
 private:
-    osg::StateSet *create(bool renderCompositeMap, bool displayCompositeMap, osg::Texture2D *compositeMap, int lodLevel);
+    osg::StateSet *create(bool renderCompositeMap, osg::Texture2D *compositeMap, osg::Texture2D *normalMap, int lodLevel);
 
     std::vector<LayerInfo> mLayerList;
     std::vector<osg::ref_ptr<osg::Image>> mBlendmapList;
@@ -53,6 +55,8 @@ private:
     bool mParallaxMapping;
 
     Storage *mStorage;
+
+    static std::map<LayerIdentifier,osg::ref_ptr<osg::Program>> mPrograms;
 };
 
 }

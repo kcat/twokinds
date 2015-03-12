@@ -159,6 +159,7 @@ namespace Terrain
 
         osg::ref_ptr<osg::StateSet> mMaterial;
         osg::ref_ptr<osg::Texture2D> mCompositeMap;
+        osg::ref_ptr<osg::Texture2D> mNormalMap;
 
         osg::PrimitiveSet *getIndexBuffer() const;
 
