@@ -137,6 +137,7 @@ void Pipeline::init(osg::Group *scene)
     mGBufferDepthStencil = createTextureRect(mTextureWidth, mTextureHeight, GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV);
     mDiffuseLight  = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
     mSpecularLight = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+    mFinalBuffer = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
 
     // Main pass (generates colors, normals, positions, and emissive diffuse lighting).
     mMainPass = createRTTCamera(osg::Camera::COLOR_BUFFER0, mGBufferColors.get());
@@ -190,27 +191,39 @@ void Pipeline::init(osg::Group *scene)
         ss->setAttributeAndModes(stencil.get());
     }
 
-    // Combiner pass (renders final output).
-    mCombinerPass = new osg::Camera();
-    mCombinerPass->setRenderOrder(osg::Camera::POST_RENDER, -2);
+    // Combiner pass (combines colors, diffuse, and specular).
+    mCombinerPass = createRTTCamera(osg::Camera::COLOR_BUFFER, mFinalBuffer.get());
+    mCombinerPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mGBufferDepthStencil.get());
+    mCombinerPass->setRenderOrder(osg::Camera::PRE_RENDER, 2);
     mCombinerPass->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
     mCombinerPass->setProjectionResizePolicy(osg::Camera::FIXED);
     mCombinerPass->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
-    mCombinerPass->setViewport(0, 0, mScreenWidth, mScreenHeight);
     mCombinerPass->setClearMask(GL_NONE);
-    mCombinerPass->setAllowEventFocus(false);
     ss = setShaderProgram(mCombinerPass, "shaders/combiner.vert", "shaders/combiner.frag");
     ss->setTextureAttribute(0, mGBufferColors.get());
     ss->setTextureAttribute(1, mDiffuseLight.get());
     ss->setTextureAttribute(2, mSpecularLight.get());
-    ss->setTextureAttribute(3, mGBufferDepthStencil.get());
     ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
                              osg::StateAttribute::OFF);
-    ss->addUniform(new osg::Uniform("ColorTex",        0));
-    ss->addUniform(new osg::Uniform("DiffuseTex",      1));
-    ss->addUniform(new osg::Uniform("SpecularTex",     2));
-    ss->addUniform(new osg::Uniform("DepthStencilTex", 3));
+    ss->addUniform(new osg::Uniform("ColorTex",    0));
+    ss->addUniform(new osg::Uniform("DiffuseTex",  1));
+    ss->addUniform(new osg::Uniform("SpecularTex", 2));
     mCombinerPass->addChild(createScreenQuad(osg::Vec2f(), 1.0f, 1.0f, mTextureWidth, mTextureHeight));
+
+    mOutputPass = new osg::Camera();
+    mOutputPass->setRenderOrder(osg::Camera::POST_RENDER, -1);
+    mOutputPass->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+    mOutputPass->setProjectionResizePolicy(osg::Camera::FIXED);
+    mOutputPass->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
+    mOutputPass->setViewport(0, 0, mScreenWidth, mScreenHeight);
+    mOutputPass->setClearMask(GL_NONE);
+    mOutputPass->setAllowEventFocus(false);
+    ss = setShaderProgram(mOutputPass.get(), "shaders/quad_2d.vert", "shaders/quad_rect.frag");
+    ss->setTextureAttribute(0, mFinalBuffer.get());
+    ss->addUniform(new osg::Uniform("ImageTex", 0));
+    ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
+                             osg::StateAttribute::OFF);
+    mOutputPass->addChild(createScreenQuad(osg::Vec2f(), 1.0f, 1.0f, mTextureWidth, mTextureHeight));
 
     // Graph.
     mGraph = new osg::Group();
@@ -218,6 +231,7 @@ void Pipeline::init(osg::Group *scene)
     mGraph->addChild(mMainPass.get());
     mGraph->addChild(mLightPass.get());
     mGraph->addChild(mCombinerPass.get());
+    mGraph->addChild(mOutputPass.get());
 }
 
 void Pipeline::setProjectionMatrix(const osg::Matrix &matrix)

@@ -33,6 +33,7 @@ class Pipeline : public Singleton<Pipeline> {
     osg::ref_ptr<osg::Camera> mMainPass;
     osg::ref_ptr<osg::Camera> mLightPass;
     osg::ref_ptr<osg::Camera> mCombinerPass;
+    osg::ref_ptr<osg::Camera> mOutputPass;
 
     osg::ref_ptr<osg::Texture> mGBufferColors;
     osg::ref_ptr<osg::Texture> mGBufferNormals;
@@ -42,6 +43,8 @@ class Pipeline : public Singleton<Pipeline> {
 
     osg::ref_ptr<osg::Texture> mDiffuseLight;
     osg::ref_ptr<osg::Texture> mSpecularLight;
+
+    osg::ref_ptr<osg::Texture> mFinalBuffer;
 
     osg::ref_ptr<osg::Camera> mDebugMapDisplay;
 
