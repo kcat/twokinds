@@ -138,17 +138,25 @@ void Pipeline::init(osg::Group *scene)
     mDiffuseLight  = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
     mSpecularLight = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
 
-    // Main pass (generates colors, normals, positions).
+    // Main pass (generates colors, normals, positions, and emissive diffuse lighting).
     mMainPass = createRTTCamera(osg::Camera::COLOR_BUFFER0, mGBufferColors.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER1, mGBufferNormals.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER2, mGBufferPositions.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER3, mDiffuseLight.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER4, mSpecularLight.get());
     mMainPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mGBufferDepthStencil.get());
-    mMainPass->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     mMainPass->setRenderOrder(osg::Camera::PRE_RENDER, 0);
     osg::StateSet *ss = mMainPass->getOrCreateStateSet();
     ss->addUniform(new osg::Uniform("illumination_color", osg::Vec4()));
+    {
+        // Make sure to clear stencil bit 0x1 by default (geometry that doesn't
+        // want external lighting should set bit 0x1 on z-pass).
+        osg::ref_ptr<osg::Stencil> stencil = new osg::Stencil();
+        stencil->setWriteMask(~0);
+        stencil->setFunction(osg::Stencil::ALWAYS, 0x00, 0x01);
+        stencil->setOperation(osg::Stencil::KEEP, osg::Stencil::KEEP, osg::Stencil::REPLACE);
+        ss->setAttributeAndModes(stencil.get());
+    }
     mMainPass->addChild(scene);
 
     // Lighting pass (generates diffuse and specular).
@@ -174,16 +182,12 @@ void Pipeline::init(osg::Group *scene)
     ss->addUniform(new osg::Uniform("diffuse_color", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)));
     ss->addUniform(new osg::Uniform("specular_color", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)));
     {
-        osg::ref_ptr<osg::Geode> geode = createScreenQuad(osg::Vec2f(), 1.0f, 1.0, 0.0f, 0.0f);
-        ss = setShaderProgram(geode.get(), "shaders/quad_flat.vert", "shaders/quad_flat.frag");
-        ss->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
-        // Set full-bright lighting for pixels that have stencil bit 0x1 set
+        // Skip lighting for pixels that have stencil bit 0x1 set
         osg::ref_ptr<osg::Stencil> stencil = new osg::Stencil();
         stencil->setWriteMask(0);
-        stencil->setFunction(osg::Stencil::EQUAL, 0x1, 0x1);
+        stencil->setFunction(osg::Stencil::EQUAL, 0x0, 0x1);
         stencil->setOperation(osg::Stencil::KEEP, osg::Stencil::KEEP, osg::Stencil::KEEP);
         ss->setAttributeAndModes(stencil.get());
-        mLightPass->addChild(geode.get());
     }
 
     // Combiner pass (renders final output).
@@ -195,18 +199,18 @@ void Pipeline::init(osg::Group *scene)
     mCombinerPass->setViewport(0, 0, mScreenWidth, mScreenHeight);
     mCombinerPass->setClearMask(GL_NONE);
     mCombinerPass->setAllowEventFocus(false);
-    mCombinerPass->addChild(createScreenQuad(osg::Vec2f(), 1.0f, 1.0f, mTextureWidth, mTextureHeight));
     ss = setShaderProgram(mCombinerPass, "shaders/combiner.vert", "shaders/combiner.frag");
     ss->setTextureAttribute(0, mGBufferColors.get());
     ss->setTextureAttribute(1, mDiffuseLight.get());
     ss->setTextureAttribute(2, mSpecularLight.get());
     ss->setTextureAttribute(3, mGBufferDepthStencil.get());
-    ss->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
-                     osg::StateAttribute::OFF);
+    ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
+                             osg::StateAttribute::OFF);
     ss->addUniform(new osg::Uniform("ColorTex",        0));
     ss->addUniform(new osg::Uniform("DiffuseTex",      1));
     ss->addUniform(new osg::Uniform("SpecularTex",     2));
     ss->addUniform(new osg::Uniform("DepthStencilTex", 3));
+    mCombinerPass->addChild(createScreenQuad(osg::Vec2f(), 1.0f, 1.0f, mTextureWidth, mTextureHeight));
 
     // Graph.
     mGraph = new osg::Group();
@@ -227,8 +231,8 @@ osg::Node* Pipeline::createDirectionalLight()
     osg::ref_ptr<osg::Geode> light = createScreenQuad(osg::Vec2f(0.0f, 0.0f), 1.0f, 1.0f,
                                                       mTextureWidth, mTextureHeight);
     osg::StateSet *ss = setShaderProgram(light, "shaders/dir_light.vert", "shaders/dir_light.frag");
-    ss->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
-                     osg::StateAttribute::OFF);
+    ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
+                             osg::StateAttribute::OFF);
 
     mLightPass->addChild(light.get());
     return light.release();
