@@ -116,6 +116,7 @@ set(HDRS src/archives/physfs.hpp
          src/terrain/terraingrid.hpp
          src/terrain/world.hpp
          src/terrain.hpp
+         src/timer.hpp
          src/log.hpp
          src/cvars.hpp
          src/engine.hpp
@@ -142,6 +143,7 @@ set(SRCS src/archives/physfs.cpp
          src/terrain/terraingrid.cpp
          src/terrain/world.cpp
          src/terrain.cpp
+         src/timer.cpp
          src/log.cpp
          src/cvars.cpp
          src/engine.cpp

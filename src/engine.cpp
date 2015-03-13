@@ -29,6 +29,7 @@
 #include "render/mygui_osgrendermanager.h"
 #include "render/sdl2_osggraphicswindow.h"
 #include "render/pipeline.hpp"
+#include "timer.hpp"
 
 
 inline std::ostream& operator<<(std::ostream &out, const osg::Vec3f &vec)
@@ -80,6 +81,8 @@ Engine::~Engine(void)
 
     delete mInput;
     mInput = nullptr;
+
+    delete Timer::getPtr();
 
     if(mSDLWindow)
     {
@@ -273,6 +276,9 @@ bool Engine::go(void)
         throw std::runtime_error(sstr.str());
     }
 
+    Log::get().message("Initializing timer...");
+    new Timer();
+
     // Setup resources
     Log::get().message("Initializing resources...");
     {
@@ -423,26 +429,26 @@ bool Engine::go(void)
     World::get().initialize(viewer.get(), mSceneRoot.get(), mCameraPos);
 
     // Frame rate tracking...
-    double last_fps_time = 0.0;
+    Uint32 last_fps_time = 0;
     double last_fps = 0.0;
     int frame_count = 0;
 
     // And away we go!
-    const Uint32 base_time = SDL_GetTicks();
-    double last_time = 0.0;
+    Uint32 last_tick = Timer::getTickCount();
     while(!viewer->done() && pumpEvents())
     {
         const Uint8 *keystate = SDL_GetKeyboardState(NULL);
         if(keystate[SDL_SCANCODE_ESCAPE])
             break;
 
-        Uint32 current_time = SDL_GetTicks() - base_time;
-        double frame_time = current_time / 1000.0;
-        if(frame_time < last_time)
-            throw std::runtime_error("Tick count overflow");
+        Uint32 current_tick = Timer::getTickCount();
+        Uint32 tick_count = current_tick - last_tick;
+        last_tick = current_tick;
 
 
-        double timediff = std::min(1.0/20.0, frame_time-last_time);
+        Timer::get() += tick_count;
+
+        double timediff = std::min(1.0/20.0, Timer::AsSeconds(tick_count));
         if(mGui->getMode() == Gui::Mode_Game)
         {
             float speed = 60.0f * timediff;
@@ -474,10 +480,11 @@ bool Engine::go(void)
 
         World::get().update(mCameraPos);
 
-        if(frame_time-last_fps_time >= 1.0)
+        last_fps_time += tick_count;
+        if(last_fps_time >= Timer::TicksPerSecond())
         {
-            last_fps = frame_count / (frame_time-last_fps_time);
-            last_fps_time = frame_time;
+            last_fps = frame_count / Timer::AsSeconds(last_fps_time);
+            last_fps_time = 0;
             frame_count = 0;
         }
 
@@ -502,7 +509,6 @@ bool Engine::go(void)
         }
 
         viewer->frame(timediff);
-        last_time = frame_time;
         ++frame_count;
     }
 
