@@ -125,16 +125,16 @@ void Pipeline::init(osg::Group *scene)
         mGBufferColors       = nullptr;
         mGBufferNormals      = nullptr;
         mGBufferPositions    = nullptr;
-        mGBufferDepthStencil = nullptr;
+        mDepthStencil        = nullptr;
 
         mDiffuseLight  = nullptr;
         mSpecularLight = nullptr;
     }
 
-    mGBufferColors       = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
-    mGBufferNormals      = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-    mGBufferPositions    = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
-    mGBufferDepthStencil = createTextureRect(mTextureWidth, mTextureHeight, GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV);
+    mGBufferColors    = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
+    mGBufferNormals   = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+    mGBufferPositions = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
+    mDepthStencil     = createTextureRect(mTextureWidth, mTextureHeight, GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV);
     mDiffuseLight  = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
     mSpecularLight = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
     mFinalBuffer = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
@@ -145,7 +145,7 @@ void Pipeline::init(osg::Group *scene)
     mMainPass->attach(osg::Camera::COLOR_BUFFER2, mGBufferPositions.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER3, mDiffuseLight.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER4, mSpecularLight.get());
-    mMainPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mGBufferDepthStencil.get());
+    mMainPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
     mMainPass->setRenderOrder(osg::Camera::PRE_RENDER, 0);
     osg::StateSet *ss = mMainPass->getOrCreateStateSet();
     ss->addUniform(new osg::Uniform("illumination_color", osg::Vec4()));
@@ -163,7 +163,7 @@ void Pipeline::init(osg::Group *scene)
     // Lighting pass (generates diffuse and specular).
     mLightPass = createRTTCamera(osg::Camera::COLOR_BUFFER0, mDiffuseLight.get());
     mLightPass->attach(osg::Camera::COLOR_BUFFER1, mSpecularLight.get());
-    mLightPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mGBufferDepthStencil.get());
+    mLightPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
     mLightPass->setClearMask(GL_NONE);
     mLightPass->setRenderOrder(osg::Camera::PRE_RENDER, 1);
     mLightPass->setCullingMode(osg::CullSettings::NO_CULLING);
@@ -193,7 +193,7 @@ void Pipeline::init(osg::Group *scene)
 
     // Combiner pass (combines colors, diffuse, and specular).
     mCombinerPass = createRTTCamera(osg::Camera::COLOR_BUFFER, mFinalBuffer.get());
-    mCombinerPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mGBufferDepthStencil.get());
+    mCombinerPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
     mCombinerPass->setRenderOrder(osg::Camera::PRE_RENDER, 2);
     mCombinerPass->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
     mCombinerPass->setProjectionResizePolicy(osg::Camera::FIXED);

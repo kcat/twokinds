@@ -38,8 +38,7 @@ class Pipeline : public Singleton<Pipeline> {
     osg::ref_ptr<osg::Texture> mGBufferColors;
     osg::ref_ptr<osg::Texture> mGBufferNormals;
     osg::ref_ptr<osg::Texture> mGBufferPositions;
-
-    osg::ref_ptr<osg::Texture> mGBufferDepthStencil;
+    osg::ref_ptr<osg::Texture> mDepthStencil;
 
     osg::ref_ptr<osg::Texture> mDiffuseLight;
     osg::ref_ptr<osg::Texture> mSpecularLight;
