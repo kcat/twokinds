@@ -390,7 +390,7 @@ bool Engine::go(void)
         Pipeline *pipeline = new Pipeline(screen_width, screen_height);
         pipeline->init(mSceneRoot.get());
         pipeline->setProjectionMatrix(osg::Matrix::perspective(
-            65.0, double(screen_width)/double(screen_height), 1.0, 50000.0
+            *r_fov, pipeline->getAspectRatio(), 1.0, 50000.0
         ));
 
         // Add a light so we can see

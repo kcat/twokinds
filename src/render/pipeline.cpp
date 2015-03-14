@@ -14,9 +14,14 @@
 
 #include <osgDB/ReadFile>
 
+#include "cvars.hpp"
+
 
 namespace TK
 {
+
+CVAR(CVarInt, r_fov, 65, 40, 120);
+
 
 template<>
 Pipeline *Singleton<Pipeline>::sInstance = nullptr;

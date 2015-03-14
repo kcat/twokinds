@@ -153,8 +153,8 @@ std::string CVarBool::get() const
 }
 
 
-CVarInt::CVarInt(std::string&& name, int value)
-  : CVar(std::move(name)), mValue(value)
+CVarInt::CVarInt(std::string&& name, int value, int minval, int maxval)
+  : CVar(std::move(name)), mMinValue(minval), mMaxValue(maxval), mValue(value)
 {
 }
 
@@ -163,7 +163,7 @@ bool CVarInt::set(const std::string &value)
     char *end;
     long val = strtol(value.c_str(), &end, 0);
     if(!end || *end != '\0') return false;
-    mValue = val;
+    mValue = std::min<long>(std::max<long>(val, mMinValue), mMaxValue);
     return true;
 }
 

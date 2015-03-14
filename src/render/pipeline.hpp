@@ -7,6 +7,7 @@
 #include <osg/Camera>
 
 #include "singleton.hpp"
+#include "cvars.hpp"
 
 
 namespace osg
@@ -21,6 +22,9 @@ namespace osg
 
 namespace TK
 {
+
+EXTERN_CVAR(CVarInt, r_fov);
+
 
 class Pipeline : public Singleton<Pipeline> {
     int mScreenWidth;
@@ -66,6 +70,10 @@ public:
 
     void init(osg::Group *scene);
 
+    double getAspectRatio() const
+    {
+        return double(mScreenWidth) / double(mScreenHeight);
+    }
     void setProjectionMatrix(const osg::Matrix &matrix);
 
     osg::Node *createDirectionalLight();
@@ -76,12 +84,6 @@ public:
     osg::StateSet *getLightingStateSet() { return mLightPass->getStateSet(); }
 
     osg::Group *getGraphRoot() const { return mGraph.get(); }
-    osg::Texture *getColorTexture() const { return mGBufferColors.get(); }
-    osg::Texture *getNormalsTexture() const { return mGBufferNormals.get(); }
-    osg::Texture *getPositionsTexture() const { return mGBufferPositions.get(); }
-
-    osg::Texture *getDiffuseTexture() const { return mDiffuseLight.get(); }
-    osg::Texture *getSpecularTexture() const { return mSpecularLight.get(); }
 };
 
 } // namespace TK

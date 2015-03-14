@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <limits>
 
 namespace TK
 {
@@ -21,6 +22,7 @@ public:
 };
 
 class CVarString : public CVar {
+protected:
     std::string mValue;
 
 public:
@@ -34,6 +36,7 @@ public:
 };
 
 class CVarBool : public CVar {
+protected:
     bool mValue;
 
 public:
@@ -46,10 +49,13 @@ public:
 };
 
 class CVarInt : public CVar {
+protected:
+    const int mMinValue, mMaxValue;
     int mValue;
 
 public:
-    CVarInt(std::string&& name, int value);
+    CVarInt(std::string&& name, int value, int minval=std::numeric_limits<int>::min(),
+                                           int maxval=std::numeric_limits<int>::max());
 
     int operator*() const { return mValue; }
 
@@ -59,8 +65,8 @@ public:
 
 } // namespace TK
 
-#define EXTERN_CVAR(T, name) extern ::TK::T name
+#define CVAR(T, name, ...) ::TK::T name(#name, __VA_ARGS__)
 
-#define CVAR(T, name, value) ::TK::T name(#name, value)
+#define EXTERN_CVAR(T, name) extern ::TK::T name
 
 #endif /* CVARS_HPP */
