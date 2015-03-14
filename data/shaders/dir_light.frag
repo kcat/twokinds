@@ -26,7 +26,7 @@ void main()
 
     // Lambertian diffuse color.
     vec3 diff = max(ambient_color.rgb,
-                    diffuse_color.rgb * dot(lightDir_viewspace, n_viewspace)
+                    diffuse_color.rgb * s_viewspace * dot(lightDir_viewspace, n_viewspace)
     );
 
     // Direction from point to camera.
@@ -35,8 +35,8 @@ void main()
     // Blinn-Phong specular highlights.
     vec3 h_viewspace = normalize(lightDir_viewspace + viewDir_viewspace);
     float amount = max(0.0, dot(h_viewspace, n_viewspace));
-    vec3 spec = specular_color.rgb * pow(amount, 32.0) * c_viewspace.a;
+    vec3 spec = specular_color.rgb * s_viewspace * pow(amount, 32.0) * c_viewspace.a;
 
-    DiffuseData  = vec4(diff * s_viewspace, 1.0);
-    SpecularData = vec4(spec * s_viewspace, 1.0);
+    DiffuseData  = vec4(diff, 1.0);
+    SpecularData = vec4(spec, 1.0);
 }
