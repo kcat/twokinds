@@ -139,14 +139,22 @@ void Pipeline::init(osg::Group *scene)
     mSpecularLight = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
     mFinalBuffer = createTextureRect(mTextureWidth, mTextureHeight, GL_RGBA16F, GL_RGBA, GL_FLOAT);
 
+    int pre_render_pass = 0;
+
+    // Clear pass (clears specular and depth buffers)
+    mClearPass = createRTTCamera(osg::Camera::COLOR_BUFFER, mSpecularLight.get());
+    mClearPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
+    mClearPass->setRenderOrder(osg::Camera::PRE_RENDER, pre_render_pass++);
+
     // Main pass (generates colors, normals, positions, and emissive diffuse lighting).
     mMainPass = createRTTCamera(osg::Camera::COLOR_BUFFER0, mGBufferColors.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER1, mGBufferNormals.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER2, mGBufferPositions.get());
     mMainPass->attach(osg::Camera::COLOR_BUFFER3, mDiffuseLight.get());
-    mMainPass->attach(osg::Camera::COLOR_BUFFER4, mSpecularLight.get());
     mMainPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
-    mMainPass->setRenderOrder(osg::Camera::PRE_RENDER, 0);
+    // FIXME: Once sky rendering is implemented, don't clear buffers here
+    //mMainPass->setClearMask(GL_NONE);
+    mMainPass->setRenderOrder(osg::Camera::PRE_RENDER, pre_render_pass++);
     osg::StateSet *ss = mMainPass->getOrCreateStateSet();
     ss->addUniform(new osg::Uniform("illumination_color", osg::Vec4()));
     {
@@ -165,7 +173,7 @@ void Pipeline::init(osg::Group *scene)
     mLightPass->attach(osg::Camera::COLOR_BUFFER1, mSpecularLight.get());
     mLightPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
     mLightPass->setClearMask(GL_NONE);
-    mLightPass->setRenderOrder(osg::Camera::PRE_RENDER, 1);
+    mLightPass->setRenderOrder(osg::Camera::PRE_RENDER, pre_render_pass++);
     mLightPass->setCullingMode(osg::CullSettings::NO_CULLING);
     mLightPass->setProjectionResizePolicy(osg::Camera::FIXED);
     mLightPass->setProjectionMatrixAsOrtho2D(0.0, 1.0, 0.0, 1.0);
@@ -194,29 +202,30 @@ void Pipeline::init(osg::Group *scene)
     // Combiner pass (combines colors, diffuse, and specular).
     mCombinerPass = createRTTCamera(osg::Camera::COLOR_BUFFER, mFinalBuffer.get());
     mCombinerPass->attach(osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, mDepthStencil.get());
-    mCombinerPass->setRenderOrder(osg::Camera::PRE_RENDER, 2);
+    mCombinerPass->setClearMask(GL_NONE);
+    mCombinerPass->setRenderOrder(osg::Camera::PRE_RENDER, pre_render_pass++);
     mCombinerPass->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
     mCombinerPass->setProjectionResizePolicy(osg::Camera::FIXED);
     mCombinerPass->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
-    mCombinerPass->setClearMask(GL_NONE);
-    ss = setShaderProgram(mCombinerPass, "shaders/combiner.vert", "shaders/combiner.frag");
+    ss = setShaderProgram(mCombinerPass.get(), "shaders/combiner.vert", "shaders/combiner.frag");
+    ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
+                             osg::StateAttribute::OFF);
     ss->setTextureAttribute(0, mGBufferColors.get());
     ss->setTextureAttribute(1, mDiffuseLight.get());
     ss->setTextureAttribute(2, mSpecularLight.get());
-    ss->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
-                             osg::StateAttribute::OFF);
     ss->addUniform(new osg::Uniform("ColorTex",    0));
     ss->addUniform(new osg::Uniform("DiffuseTex",  1));
     ss->addUniform(new osg::Uniform("SpecularTex", 2));
     mCombinerPass->addChild(createScreenQuad(osg::Vec2f(), 1.0f, 1.0f, mTextureWidth, mTextureHeight));
 
+    // Final output to back buffer
     mOutputPass = new osg::Camera();
+    mOutputPass->setClearMask(GL_NONE);
     mOutputPass->setRenderOrder(osg::Camera::POST_RENDER, -1);
     mOutputPass->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
     mOutputPass->setProjectionResizePolicy(osg::Camera::FIXED);
     mOutputPass->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
     mOutputPass->setViewport(0, 0, mScreenWidth, mScreenHeight);
-    mOutputPass->setClearMask(GL_NONE);
     mOutputPass->setAllowEventFocus(false);
     ss = setShaderProgram(mOutputPass.get(), "shaders/quad_2d.vert", "shaders/quad_rect.frag");
     ss->setTextureAttribute(0, mFinalBuffer.get());
@@ -228,6 +237,7 @@ void Pipeline::init(osg::Group *scene)
     // Graph.
     mGraph = new osg::Group();
 
+    mGraph->addChild(mClearPass.get());
     mGraph->addChild(mMainPass.get());
     mGraph->addChild(mLightPass.get());
     mGraph->addChild(mCombinerPass.get());

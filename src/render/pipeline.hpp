@@ -30,6 +30,7 @@ class Pipeline : public Singleton<Pipeline> {
     int mTextureHeight;
 
     osg::ref_ptr<osg::Group> mGraph;
+    osg::ref_ptr<osg::Camera> mClearPass;
     osg::ref_ptr<osg::Camera> mMainPass;
     osg::ref_ptr<osg::Camera> mLightPass;
     osg::ref_ptr<osg::Camera> mCombinerPass;
