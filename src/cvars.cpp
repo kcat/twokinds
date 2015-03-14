@@ -3,10 +3,7 @@
 
 #include <cassert>
 #include <cstring>
-
-//  FIXME: Shouldn't really use Ogre here...
-#include <OgreString.h>
-#include <OgreStringConverter.h>
+#include <cstdlib>
 
 #include "gui/iface.hpp"
 #include "delegates.hpp"
@@ -163,9 +160,10 @@ CVarInt::CVarInt(std::string&& name, int value)
 
 bool CVarInt::set(const std::string &value)
 {
-    if(!Ogre::StringConverter::isNumber(value))
-        return false;
-    mValue = Ogre::StringConverter::parseInt(value);
+    char *end;
+    long val = strtol(value.c_str(), &end, 0);
+    if(!end || *end != '\0') return false;
+    mValue = val;
     return true;
 }
 
