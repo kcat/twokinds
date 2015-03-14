@@ -469,7 +469,7 @@ void QuadTreeNode::load(const LoadResponseData &data)
     geom->setColorArray(new osg::Vec4ubArray(data.mColours.size(), data.mColours.data()), osg::Array::BIND_PER_VERTEX);
     geom->setTexCoordArray(0, mTerrain->getBufferCache().getUVBuffer(), osg::Array::BIND_PER_VERTEX);
     geom->getColorArray()->setNormalize(true);
-    geom->addPrimitiveSet(getIndexBuffer());
+    geom->addPrimitiveSet(getPrimitive());
     geom->setUseDisplayList(false);
     geom->setUseVertexBufferObjects(true);
 
@@ -507,7 +507,7 @@ void QuadTreeNode::updateIndexBuffers()
     {
         osg::Geometry *geom = mGeode->getDrawable(0)->asGeometry();
         geom->removePrimitiveSet(0, geom->getNumPrimitiveSets());
-        geom->addPrimitiveSet(getIndexBuffer());
+        geom->addPrimitiveSet(getPrimitive());
     }
     else if(hasChildren())
     {
@@ -516,10 +516,10 @@ void QuadTreeNode::updateIndexBuffers()
     }
 }
 
-osg::PrimitiveSet *QuadTreeNode::getIndexBuffer() const
+osg::PrimitiveSet *QuadTreeNode::getPrimitive() const
 {
-    // Fetch a suitable index buffer (which may be shared)
-    unsigned int flags = 0;
+    // Fetch a suitable Primitive for drawing (which may be shared)
+    unsigned int flags = mLodLevel << (4*4);
     for(int i = 0;i < 4;++i)
     {
         QuadTreeNode* neighbour = mNeighbours[i];
@@ -546,7 +546,7 @@ osg::PrimitiveSet *QuadTreeNode::getIndexBuffer() const
         }
     }
 
-    return mTerrain->getBufferCache().getIndexBuffer(flags);
+    return mTerrain->getBufferCache().getPrimitive(flags);
 }
 
 
