@@ -19,12 +19,6 @@
 #include "log.hpp"
 
 
-#if OGRE_VERSION >= ((2<<16) | (0<<8) | 0)
-#define const_OGRE2 const
-#else
-#define const_OGRE2
-#endif
-
 namespace
 {
 

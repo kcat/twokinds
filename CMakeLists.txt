@@ -107,7 +107,6 @@ set(HDRS src/archives/physfs.hpp
          src/gui/iface.hpp
          src/gui/gui.hpp
          src/terrain/buffercache.hpp
-         src/terrain/chunk.hpp
          src/terrain/defaultworld.hpp
          src/terrain/defs.hpp
          src/terrain/material.hpp
@@ -135,7 +134,6 @@ set(SRCS src/archives/physfs.cpp
          src/input/input.cpp
          src/gui/gui.cpp
          src/terrain/buffercache.cpp
-         src/terrain/chunk.cpp
          src/terrain/defaultworld.cpp
          src/terrain/material.cpp
          src/terrain/quadtreenode.cpp

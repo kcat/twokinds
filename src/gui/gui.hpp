@@ -18,7 +18,6 @@ namespace osgViewer
 
 namespace MyGUI
 {
-    class OgrePlatform;
     class Gui;
     class TextBox;
 }

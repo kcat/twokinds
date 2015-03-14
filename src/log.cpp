@@ -6,8 +6,6 @@
 #include <chrono>
 #include <ctime>
 
-#include <OgreLog.h>
-
 #include "gui/iface.hpp"
 
 namespace TK

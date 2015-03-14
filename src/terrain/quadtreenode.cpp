@@ -10,7 +10,6 @@
 #include <osg/Texture2D>
 
 #include "defaultworld.hpp"
-#include "chunk.hpp"
 #include "storage.hpp"
 #include "buffercache.hpp"
 #include "material.hpp"
