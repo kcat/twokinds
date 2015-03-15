@@ -6,12 +6,14 @@
 
 #include <MyGUI_Delegate.h>
 
+#include "referenceable.hpp"
+
 
 namespace TK
 {
 
 template<typename ...Args>
-class IDelegate
+class IDelegate : public Referenceable
 {
 public:
     virtual ~IDelegate() { }
@@ -30,7 +32,7 @@ class CStaticDelegate : public IDelegate<Args...>
     Func mFunc;
 
 public:
-    CStaticDelegate(Func _func) : mFunc(_func) { }
+    CStaticDelegate(Func _func=nullptr) : mFunc(_func) { }
 
     virtual bool isType(const std::type_info& _type)
     {
@@ -98,20 +100,12 @@ class CDelegate
 {
     typedef IDelegate<Args...> DelegateT;
 
-    // No copying (only moving)
-    CDelegate(const CDelegate<Args...> &_event) = delete;
-    CDelegate<Args...>& operator=(const CDelegate<Args...>& _event) = delete;
-
-    DelegateT *mDelegate;
+    ref_ptr<DelegateT> mDelegate;
 
 public:
     CDelegate(DelegateT *_delegate=nullptr) : mDelegate(_delegate) { }
-    CDelegate(CDelegate<Args...> &&_event) : mDelegate(nullptr)
-    {
-        // take ownership
-        std::swap(mDelegate, _event.mDelegate);
-    }
-
+    CDelegate(const CDelegate<Args...> &_event) : mDelegate(_event) { }
+    CDelegate(CDelegate<Args...> &&_event) : mDelegate(std::move(_event)) { }
     ~CDelegate()
     {
         clear();
@@ -119,25 +113,30 @@ public:
 
     bool empty() const
     {
-        return mDelegate == nullptr;
+        return !mDelegate.valid();
     }
 
     void clear()
     {
-        delete mDelegate;
         mDelegate = nullptr;
     }
 
+    CDelegate<Args...>& operator=(const CDelegate<Args...> &_event)
+    {
+        mDelegate = _event.mDelegate;
+        return *this;
+    }
     CDelegate<Args...>& operator=(CDelegate<Args...>&& _event)
     {
         // take ownership
-        std::swap(mDelegate, _event.mDelegate);
+        mDelegate = std::move(_event.mDelegate);
         return *this;
     }
 
     void operator()(Args...args)
     {
-        if (mDelegate == nullptr) return;
+        if(!mDelegate.valid())
+            return;
         mDelegate->invoke(args...);
     }
 };
@@ -146,45 +145,14 @@ template<typename ...Args>
 class CMultiDelegate
 {
     typedef IDelegate<Args...> DelegateT;
-    typedef typename std::list<DelegateT* /*, Allocator<DelegateT*>*/ > ListDelegate;
-
-    // No copying (only moving)
-    CMultiDelegate(const CMultiDelegate<Args...>& _event) = delete;
-    CMultiDelegate<Args...>& operator=(const CMultiDelegate<Args...>& _event) = delete;
-
-    void safe_clear(ListDelegate& _delegates)
-    {
-        for(auto &_deleg : mListDelegates)
-        {
-            if(_deleg)
-            {
-                DelegateT *del = *_deleg;
-                _deleg = nullptr;
-                delete_if_not_found(del, _delegates);
-            }
-        }
-    }
-
-    static void delete_if_not_found(DelegateT *_del, ListDelegate &_delegates)
-    {
-        for(auto _deleg : _delegates)
-        {
-            if(_deleg && _deleg->compare(_del))
-                return;
-        }
-        delete _del;
-    }
+    typedef typename std::list<ref_ptr<DelegateT>> ListDelegate;
 
     ListDelegate mListDelegates;
 
 public:
     CMultiDelegate() { }
-    CMultiDelegate(CMultiDelegate<Args...>&& _event)
-    {
-        // take ownership
-        std::swap(mListDelegates, _event.mListDelegates);
-        safe_clear(mListDelegates);
-    }
+    CMultiDelegate(const CMultiDelegate<Args...> &_event) : mListDelegates(_event) { }
+    CMultiDelegate(CMultiDelegate<Args...>&& _event) : mListDelegates(std::move(_event)) { }
 
     ~CMultiDelegate()
     {
@@ -193,9 +161,9 @@ public:
 
     bool empty() const
     {
-        for(auto _deleg : mListDelegates)
+        for(const auto &_deleg : mListDelegates)
         {
-            if(_deleg)
+            if(_deleg.valid())
                 return false;
         }
         return true;
@@ -203,22 +171,15 @@ public:
 
     void clear()
     {
-        for(auto &_deleg : mListDelegates)
-        {
-            delete _deleg;
-            _deleg = nullptr;
-        }
+        mListDelegates.clear();
     }
 
     void clear(MyGUI::delegates::IDelegateUnlink *_unlink)
     {
         for(auto &_deleg : mListDelegates)
         {
-            if(_deleg && _deleg->compare(_unlink))
-            {
-                delete _deleg;
+            if(_deleg.valid() && _deleg->compare(_unlink))
                 _deleg = nullptr;
-            }
         }
     }
 
@@ -240,13 +201,10 @@ public:
             if(_deleg && _deleg->compare(_delegate))
             {
                 // проверяем на идентичность делегатов
-                if(_deleg != _delegate)
-                    delete _deleg;
                 _deleg = nullptr;
                 break;
             }
         }
-        delete _delegate;
         return *this;
     }
 
@@ -265,24 +223,28 @@ public:
         }
     }
 
+    CMultiDelegate<Args...>& operator=(const CMultiDelegate<Args...> &_event)
+    {
+        mListDelegates = _event.mListDelegates;
+        return *this;
+    }
     CMultiDelegate<Args...>& operator=(CMultiDelegate<Args...>&& _event)
     {
         // take ownership
-        std::swap(mListDelegates, _event.mListDelegates);
-        safe_clear(mListDelegates);
+        mListDelegates = std::move(_event.mListDelegates);
         return *this;
     }
 };
 
 
 template<typename ...Args>
-inline IDelegate<Args...>* makeDelegate(void (*func)(Args...))
+inline ref_ptr<IDelegate<Args...>> makeDelegate(void (*func)(Args...))
 {
     return new CStaticDelegate<Args...>(func);
 }
 
 template<typename T, typename ...Args>
-inline IDelegate<Args...>* makeDelegate(T *obj, void (T::*Func)(Args...))
+inline ref_ptr<IDelegate<Args...>> makeDelegate(T *obj, void (T::*Func)(Args...))
 {
     return new CMethodDelegate<T,Args...>(MyGUI::delegates::GetDelegateUnlink(obj), obj, Func);
 }

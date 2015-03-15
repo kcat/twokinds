@@ -115,6 +115,7 @@ set(HDRS src/archives/physfs.hpp
          src/terrain/terraingrid.hpp
          src/terrain/world.hpp
          src/terrain.hpp
+         src/referenceable.hpp
          src/timer.hpp
          src/log.hpp
          src/cvars.hpp

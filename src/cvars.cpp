@@ -64,9 +64,10 @@ public:
 
     void initialize()
     {
+        auto deleg = TK::makeDelegate(this, &CVarRegistry::setCVarValue);
         auto &gui = TK::GuiIface::get();
         for(auto &cvar : mCVarRegistry)
-            gui.addConsoleCallback(cvar.first.c_str(), TK::makeDelegate(this, &CVarRegistry::setCVarValue));
+            gui.addConsoleCallback(cvar.first.c_str(), deleg);
     }
 
     static CVarRegistry& getSingleton()

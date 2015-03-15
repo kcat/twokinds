@@ -421,8 +421,11 @@ bool Engine::go(void)
     mGui = new Gui(viewer.get(), viewer->getSceneData()->asGroup());
 
     Log::get().setGuiIface(mGui);
-    for(const auto &cmd : mCommandFuncs)
-        mGui->addConsoleCallback(cmd.first.c_str(), makeDelegate(this, &Engine::internalCommand));
+    {
+        ref_ptr<CommandDelegateT> deleg = makeDelegate(this, &Engine::internalCommand);
+        for(const auto &cmd : mCommandFuncs)
+            mGui->addConsoleCallback(cmd.first.c_str(), deleg);
+    }
     CVar::registerAll();
 
     // Set up the terrain

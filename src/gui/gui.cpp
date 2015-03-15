@@ -325,12 +325,12 @@ class Console {
         mListHistory->setCaption("");
     }
 
-    void registerConsoleDelegate(const MyGUI::UString &_command, CommandDelegate&& _delegate)
+    void registerConsoleDelegate(const MyGUI::UString &_command, CommandDelegateT *_delegate)
     {
         mComboCommand->addItem(_command);
         MapDelegate::iterator iter = mDelegates.find(_command);
         if (iter == mDelegates.end())
-            mDelegates[_command] = std::move(_delegate);
+            mDelegates[_command] = _delegate;
         else
             print("Command "+_command+" already registered");
     }
@@ -388,7 +388,8 @@ public:
         mComboCommand->eventKeyButtonPressed += newDelegate(this, &Console::notifyButtonPressed);
         mButtonSubmit->eventMouseButtonClick += newDelegate(this, &Console::notifyMouseButtonClick);
 
-        registerConsoleDelegate("clear", makeDelegate(this, &Console::internalCommand));
+        auto deleg = makeDelegate(this, &Console::internalCommand);
+        registerConsoleDelegate("clear", deleg);
     }
 
     bool getActive() const { return mMainWidget->getVisible(); }
@@ -404,9 +405,9 @@ public:
         addToConsole(str);
     }
 
-    void addCommandCallback(const MyGUI::UString &command, CommandDelegate&& delegate)
+    void addCommandCallback(const MyGUI::UString &command, CommandDelegateT *delegate)
     {
-        registerConsoleDelegate(command, std::move(delegate));
+        registerConsoleDelegate(command, delegate);
     }
 };
 
