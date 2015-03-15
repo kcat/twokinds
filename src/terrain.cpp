@@ -310,6 +310,8 @@ float TerrainStorage::getHeightAt(const osg::Vec3f &worldPos)
 }
 
 
+CVAR(CVarInt, r_mapsize, 128, 16, 1024);
+
 CCMD(rebuildcompositemaps, "rcm")
 {
     Log::get().message("Rebuilding composite maps...");
@@ -319,7 +321,8 @@ CCMD(rebuildcompositemaps, "rcm")
 
 void World::initialize(osgViewer::Viewer *viewer, osg::Group *rootNode, const osg::Vec3f &cameraPos)
 {
-    mTerrain = new Terrain::DefaultWorld(viewer, rootNode, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536);
+    mTerrain = new Terrain::DefaultWorld(viewer, rootNode, new TerrainStorage(), 1, true, Terrain::Align_XZ, 65536,
+                                         *r_mapsize);
     mTerrain->applyMaterials(false/*Settings::Manager::getBool("enabled", "Shadows")*/,
                              false/*Settings::Manager::getBool("split", "Shadows")*/);
     mTerrain->update(cameraPos);
@@ -337,7 +340,7 @@ void World::deinitialize()
 
 void World::rebuildCompositeMaps()
 {
-    mTerrain->rebuildCompositeMaps();
+    mTerrain->rebuildCompositeMaps(*r_mapsize);
 }
 
 

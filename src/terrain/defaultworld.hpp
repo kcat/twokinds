@@ -40,7 +40,7 @@ namespace Terrain
         /// @param maxBatchSize Maximum size of a terrain batch along one side (in cell units). Used when traversing the quad tree.
         DefaultWorld(osgViewer::Viewer *viewer, osg::Group *rootNode, Storage* storage,
                      int visibilityFlags, bool shaders, Alignment align,
-                     int maxBatchSize);
+                     int maxBatchSize, int compmapsize);
         ~DefaultWorld();
 
         /// Update chunk LODs according to this camera position
@@ -65,7 +65,7 @@ namespace Terrain
         /// adding or removing passes. This can only be achieved by a full rebuild.)
         virtual void applyMaterials(bool shadows, bool splitShadows);
 
-        virtual void rebuildCompositeMaps();
+        virtual void rebuildCompositeMaps(int compmapsize);
 
         int getMaxBatchSize() const { return mMaxBatchSize; }
 
@@ -108,6 +108,9 @@ namespace Terrain
 
         /// Maximum size of a terrain batch along one side (in cell units)
         int mMaxBatchSize;
+
+        /// Composite map size
+        int mCompositeMapSize;
 
     public:
         // ----INTERNAL----

@@ -76,7 +76,7 @@ namespace Terrain
         /// adding or removing passes. This can only be achieved by a full rebuild.)
         virtual void applyMaterials(bool shadows, bool splitShadows) = 0;
 
-        virtual void rebuildCompositeMaps() { }
+        virtual void rebuildCompositeMaps(int) { }
 
         int getVisibilityFlags() { return mVisibilityFlags; }
 

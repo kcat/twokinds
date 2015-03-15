@@ -671,6 +671,7 @@ void QuadTreeNode::applyMaterials()
 void QuadTreeNode::clearCompositeMaps()
 {
     mCompositeMap = nullptr;
+    mNormalMap = nullptr;
     if(hasChildren())
     {
         for(int i = 0;i < 4;++i)

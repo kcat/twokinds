@@ -68,7 +68,8 @@ namespace Terrain
     //const Ogre::uint REQ_ID_LAYER = 2;
 
     DefaultWorld::DefaultWorld(osgViewer::Viewer *viewer, osg::Group *rootNode, Storage *storage,
-                               int visibilityFlags, bool shaders, Alignment align, int maxBatchSize)
+                               int visibilityFlags, bool shaders, Alignment align, int maxBatchSize,
+                               int compmapsize)
       : World(viewer, storage, visibilityFlags, shaders, align)
       , mVisible(true)
       , mChunksLoading(0)
@@ -80,7 +81,10 @@ namespace Terrain
       , mMinY(0)
       , mMaxY(0)
       , mMaxBatchSize(maxBatchSize)
+      , mCompositeMapSize(compmapsize)
     {
+        mCompositeMapSize = nextPowerOfTwo(std::max(compmapsize, 1));
+
         mRootSceneNode = new osg::Group();
         {
             osg::StateSet *state = mRootSceneNode->getOrCreateStateSet();
@@ -182,8 +186,12 @@ namespace Terrain
         return node->getWorldBoundingBox();
     }
 
-    void DefaultWorld::rebuildCompositeMaps()
+    void DefaultWorld::rebuildCompositeMaps(int mapsize)
     {
+        if(mapsize < 0)
+            mCompositeMapSize = 128;
+        else
+            mCompositeMapSize = nextPowerOfTwo(mapsize);
         mRootNode->clearCompositeMaps();
         mRootNode->applyMaterials();
     }
@@ -191,15 +199,13 @@ namespace Terrain
     // FIXME
     void DefaultWorld::renderCompositeMap(osg::Texture2D *target, osg::Texture2D *normal, osg::Geode *geode)
     {
-        const int size = 128;
-
-        target->setTextureSize(size, size);
+        target->setTextureSize(mCompositeMapSize, mCompositeMapSize);
         target->setSourceFormat(GL_RGBA);
         target->setSourceType(GL_UNSIGNED_BYTE);
         target->setInternalFormat(GL_RGBA8);
         target->setUnRefImageDataAfterApply(true);
 
-        normal->setTextureSize(size, size);
+        normal->setTextureSize(mCompositeMapSize, mCompositeMapSize);
         normal->setSourceFormat(GL_RGBA);
         normal->setSourceType(GL_UNSIGNED_BYTE);
         normal->setInternalFormat(GL_RGBA8);
@@ -212,7 +218,7 @@ namespace Terrain
         camera->setProjectionResizePolicy(osg::Camera::FIXED);
         camera->setProjectionMatrix(osg::Matrixd::identity());
         camera->setViewMatrix(osg::Matrixd::identity());
-        camera->setViewport(0, 0, size, size);
+        camera->setViewport(0, 0, mCompositeMapSize, mCompositeMapSize);
 
         camera->setRenderOrder(osg::Camera::PRE_RENDER);
 
