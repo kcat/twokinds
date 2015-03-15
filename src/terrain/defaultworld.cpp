@@ -8,6 +8,7 @@
 #include <osg/Texture2D>
 #include <osg/Depth>
 #include <osg/Material>
+#include <osg/PolygonMode>
 
 #include "storage.hpp"
 #include "quadtreenode.hpp"
@@ -95,7 +96,13 @@ namespace Terrain
 
             state->setMode(GL_BLEND, osg::StateAttribute::OFF);
             state->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
-            state->setAttribute(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false));
+            state->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0.0, 1.0, false),
+                osg::StateAttribute::OFF
+            );
+            state->setAttribute(
+                new osg::PolygonMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL),
+                osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED
+            );
         }
 
         storage->getBounds(mMinX, mMaxX, mMinY, mMaxY);
