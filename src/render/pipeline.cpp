@@ -26,6 +26,14 @@ CVAR(CVarInt, r_fov, 65, 40, 120);
 template<>
 Pipeline *Singleton<Pipeline>::sInstance = nullptr;
 
+Pipeline::Pipeline(int width, int height)
+  : mScreenWidth(width)
+  , mScreenHeight(height)
+  , mTextureWidth(width)
+  , mTextureHeight(height)
+{
+}
+
 
 osg::ref_ptr<osg::Geometry> Pipeline::createScreenGeometry(const osg::Vec2f &corner, float width, float height, int tex_width, int tex_height, const osg::Vec4ub &color)
 {

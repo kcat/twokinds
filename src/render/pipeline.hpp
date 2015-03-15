@@ -61,12 +61,7 @@ class Pipeline : public Singleton<Pipeline> {
     static osg::StateSet *setShaderProgram(osg::Node *node, std::string vert, std::string frag);
 
 public:
-    Pipeline(int width, int height)
-      : mScreenWidth(width)
-      , mScreenHeight(height)
-      , mTextureWidth(width)
-      , mTextureHeight(height)
-    { }
+    Pipeline(int width, int height);
 
     void init(osg::Group *scene);
 
