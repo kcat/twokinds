@@ -48,6 +48,29 @@ CVAR(CVarInt, vid_height, 720);
 CVAR(CVarBool, vid_fullscreen, false);
 CVAR(CVarBool, vid_showfps, false);
 
+CCMD(savecfg)
+{
+    static const std::string default_cfg("twokinds.cfg");
+    const std::string &cfg_name = (params.empty() ? default_cfg : params);
+    auto cvars = CVar::getAll();
+
+    Log::get().stream()<< "Saving config "<<cfg_name<<"...";
+    std::ofstream ocfg(cfg_name, std::ios::binary);
+    if(!ocfg.is_open())
+        throw std::runtime_error("Failed to open "+cfg_name+" for writing");
+
+    ocfg<< "[CVars]" <<std::endl;
+    for(const auto &cvar : cvars)
+        ocfg<< cvar.first<<" = "<<cvar.second <<std::endl;
+}
+
+CCMD(qqq)
+{
+    SDL_Event evt{};
+    evt.quit.type = SDL_QUIT;
+    SDL_PushEvent(&evt);
+}
+
 
 Engine::Engine(void)
   : mSDLWindow(nullptr)
@@ -56,11 +79,8 @@ Engine::Engine(void)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
       { "rcm", &Engine::rebuildCompositeMapsCmd },
-      { "savecfg", &Engine::saveCfgCmd },
       { "twf", &Engine::toggleWireframeCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
-      { "tm", &Engine::toggleMapsCmd },
-      { "qqq", &Engine::quitCmd },
     }
 {
     new Log(Log::Level_Normal, "twokinds.log");
@@ -210,13 +230,6 @@ bool Engine::pumpEvents()
 }
 
 
-void Engine::quitCmd(const std::string&)
-{
-    SDL_Event evt{};
-    evt.quit.type = SDL_QUIT;
-    SDL_PushEvent(&evt);
-}
-
 void Engine::toggleWireframeCmd(const std::string&)
 {
     osg::StateSet *ss = mSceneRoot->getOrCreateStateSet();
@@ -236,34 +249,11 @@ void Engine::toggleDebugDisplayCmd(const std::string&)
     mDisplayDebugStats = !mDisplayDebugStats;
 }
 
-void Engine::toggleMapsCmd(const std::string&)
-{
-    Pipeline::get().toggleDebugMapDisplay();
-}
-
-
-void Engine::saveCfgCmd(const std::string &value)
-{
-    static const std::string default_cfg("twokinds.cfg");
-    const std::string &cfg_name = (value.empty() ? default_cfg : value);
-    auto cvars = CVar::getAll();
-
-    Log::get().stream()<< "Saving config "<<cfg_name<<"...";
-    std::ofstream ocfg(cfg_name, std::ios::binary);
-    if(!ocfg.is_open())
-        throw std::runtime_error("Failed to open "+cfg_name+" for writing");
-
-    ocfg<< "[CVars]" <<std::endl;
-    for(const auto &cvar : cvars)
-        ocfg<< cvar.first<<" = "<<cvar.second <<std::endl;
-}
-
 void Engine::rebuildCompositeMapsCmd(const std::string&)
 {
     Log::get().message("Rebuilding composite maps...");
     World::get().rebuildCompositeMaps();
 }
-
 
 void Engine::internalCommand(const std::string &key, const std::string &value)
 {
@@ -525,7 +515,7 @@ bool Engine::go(void)
         ++frame_count;
     }
 
-    saveCfgCmd(std::string());
+    savecfg(std::string());
 
     return true;
 }

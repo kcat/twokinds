@@ -36,6 +36,12 @@ CCMD(setfov)
 }
 
 
+CCMD(togglemaps)
+{
+    Pipeline::get().toggleDebugMapDisplay();
+}
+
+
 template<>
 Pipeline *Singleton<Pipeline>::sInstance = nullptr;
 
