@@ -11,6 +11,9 @@
 #include "terrain/storage.hpp"
 #include "terrain/quadtreenode.hpp"
 
+#include "cvars.hpp"
+#include "log.hpp"
+
 
 namespace TK
 {
@@ -306,6 +309,12 @@ float TerrainStorage::getHeightAt(const osg::Vec3f &worldPos)
     return val * TERRAIN_WORLD_HEIGHT;
 }
 
+
+CCMD(rebuildcompositemaps, "rcm")
+{
+    Log::get().message("Rebuilding composite maps...");
+    World::get().rebuildCompositeMaps();
+}
 
 
 void World::initialize(osgViewer::Viewer *viewer, osg::Group *rootNode, const osg::Vec3f &cameraPos)

@@ -78,8 +78,9 @@ Engine::Engine(void)
   , mGui(nullptr)
   , mDisplayDebugStats(false)
   , mCommandFuncs{
-      { "rcm", &Engine::rebuildCompositeMapsCmd },
+      { "togglewireframe", &Engine::toggleWireframeCmd },
       { "twf", &Engine::toggleWireframeCmd },
+      { "toggledebugdisplay", &Engine::toggleDebugDisplayCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
     }
 {
@@ -247,12 +248,6 @@ void Engine::toggleWireframeCmd(const std::string&)
 void Engine::toggleDebugDisplayCmd(const std::string&)
 {
     mDisplayDebugStats = !mDisplayDebugStats;
-}
-
-void Engine::rebuildCompositeMapsCmd(const std::string&)
-{
-    Log::get().message("Rebuilding composite maps...");
-    World::get().rebuildCompositeMaps();
 }
 
 void Engine::internalCommand(const std::string &key, const std::string &value)
