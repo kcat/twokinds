@@ -63,10 +63,30 @@ public:
     virtual std::string get() const final;
 };
 
+
+class CCmd {
+public:
+    CCmd(std::string&& name);
+    virtual ~CCmd() { }
+
+    virtual void operator()(const std::string &params) = 0;
+};
+
 } // namespace TK
 
 #define CVAR(T, name, ...) ::TK::T name(#name, __VA_ARGS__)
+#define CCMD(name) namespace {                                                \
+    class CCmd##_##name : public ::TK::CCmd {                                 \
+    public:                                                                   \
+        CCmd##_##name() : CCmd(#name) { }                                     \
+        virtual void operator()(const std::string &params) final;             \
+    };                                                                        \
+    CCmd##_##name CCmd##_##name##_cmd;                                        \
+} /* namespace */                                                             \
+::TK::CCmd &name = CCmd##_##name##_cmd;                                       \
+void CCmd##_##name::operator()(const std::string &params)
 
 #define EXTERN_CVAR(T, name) extern ::TK::T name
+#define EXTERN_CCMD(name) extern ::TK::CCmd &name
 
 #endif /* CVARS_HPP */

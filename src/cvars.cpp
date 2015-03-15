@@ -15,6 +15,7 @@ namespace
 
 class CVarRegistry {
     std::map<std::string,TK::CVar*> mCVarRegistry;
+    std::map<std::string,TK::CCmd*> mCCmdRegistry;
 
     CVarRegistry(const CVarRegistry&) = delete;
     CVarRegistry& operator=(const CVarRegistry&) = delete;
@@ -26,10 +27,21 @@ public:
     {
         mCVarRegistry.insert(std::make_pair(std::move(name), cvar));
     }
+    void add(std::string&& name, TK::CCmd *ccmd)
+    {
+        mCCmdRegistry.insert(std::make_pair(std::move(name), ccmd));
+    }
 
     const std::map<std::string,TK::CVar*>& getAll() const
     {
         return mCVarRegistry;
+    }
+
+    void callCCmd(const std::string &name, const std::string &value)
+    {
+        auto ccmd = mCCmdRegistry.find(name);
+        if(ccmd != mCCmdRegistry.end())
+            (*ccmd->second)(value);
     }
 
     void setCVarValue(const std::string &name, const std::string &value)
@@ -68,6 +80,9 @@ public:
         auto &gui = TK::GuiIface::get();
         for(auto &cvar : mCVarRegistry)
             gui.addConsoleCallback(cvar.first.c_str(), deleg);
+        deleg = TK::makeDelegate(this, &CVarRegistry::callCCmd);
+        for(auto &ccmd : mCCmdRegistry)
+            gui.addConsoleCallback(ccmd.first.c_str(), deleg);
     }
 
     static CVarRegistry& getSingleton()
@@ -105,6 +120,12 @@ std::map<std::string,std::string> CVar::getAll()
 void CVar::registerAll()
 {
     CVarRegistry::getSingleton().initialize();
+}
+
+
+CCmd::CCmd(std::string&& name)
+{
+    CVarRegistry::getSingleton().add(std::move(name), this);
 }
 
 

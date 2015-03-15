@@ -15,12 +15,25 @@
 #include <osgDB/ReadFile>
 
 #include "cvars.hpp"
+#include "log.hpp"
 
 
 namespace TK
 {
 
 CVAR(CVarInt, r_fov, 65, 40, 120);
+
+CCMD(setfov)
+{
+    if(!params.empty() && !r_fov.set(params))
+    {
+        Log::get().stream(Log::Level_Error)<< "Failed to set FOV to \""<<params<<"\"";
+        return;
+    }
+    Pipeline::get().setProjectionMatrix(osg::Matrix::perspective(
+        *r_fov, Pipeline::get().getAspectRatio(), 1.0, 50000.0
+    ));
+}
 
 
 template<>
