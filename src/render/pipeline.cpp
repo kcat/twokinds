@@ -36,7 +36,7 @@ CCMD(setfov)
 }
 
 
-CCMD(togglemaps)
+CCMD(togglemaps, "tm")
 {
     Pipeline::get().toggleDebugMapDisplay();
 }

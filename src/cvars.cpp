@@ -123,9 +123,11 @@ void CVar::registerAll()
 }
 
 
-CCmd::CCmd(std::string&& name)
+CCmd::CCmd(std::string&& name, std::initializer_list<const char*>&& aliases)
 {
     CVarRegistry::getSingleton().add(std::move(name), this);
+    for(auto alias : aliases)
+        CVarRegistry::getSingleton().add(alias, this);
 }
 
 

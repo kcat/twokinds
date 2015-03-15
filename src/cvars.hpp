@@ -66,7 +66,7 @@ public:
 
 class CCmd {
 public:
-    CCmd(std::string&& name);
+    CCmd(std::string&& name, std::initializer_list<const char*>&& aliases);
     virtual ~CCmd() { }
 
     virtual void operator()(const std::string &params) = 0;
@@ -75,10 +75,10 @@ public:
 } // namespace TK
 
 #define CVAR(T, name, ...) ::TK::T name(#name, __VA_ARGS__)
-#define CCMD(name) namespace {                                                \
+#define CCMD(name, ...) namespace {                                           \
     class CCmd##_##name : public ::TK::CCmd {                                 \
     public:                                                                   \
-        CCmd##_##name() : CCmd(#name) { }                                     \
+        CCmd##_##name() : CCmd(#name, {__VA_ARGS__}) { }                      \
         virtual void operator()(const std::string &params) final;             \
     };                                                                        \
     CCmd##_##name CCmd##_##name##_cmd;                                        \
