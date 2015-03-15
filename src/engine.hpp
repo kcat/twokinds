@@ -53,7 +53,7 @@ class Engine
     bool pumpEvents();
 
     void quitCmd(const std::string &value);
-    void toggleBoundingBoxCmd(const std::string &value);
+    void toggleWireframeCmd(const std::string &value);
     void toggleDebugDisplayCmd(const std::string &value);
     void toggleMapsCmd(const std::string &value);
     void saveCfgCmd(const std::string &value);

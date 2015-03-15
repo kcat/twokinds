@@ -16,6 +16,7 @@
 #include <osgDB/Registry>
 #include <osgDB/ReadFile>
 #include <osg/MatrixTransform>
+#include <osg/PolygonMode>
 
 #include "archives/physfs.hpp"
 #include "input/input.hpp"
@@ -56,7 +57,7 @@ Engine::Engine(void)
   , mCommandFuncs{
       { "rcm", &Engine::rebuildCompositeMapsCmd },
       { "savecfg", &Engine::saveCfgCmd },
-      { "tbb", &Engine::toggleBoundingBoxCmd },
+      { "twf", &Engine::toggleWireframeCmd },
       { "tdd", &Engine::toggleDebugDisplayCmd },
       { "tm", &Engine::toggleMapsCmd },
       { "qqq", &Engine::quitCmd },
@@ -216,9 +217,18 @@ void Engine::quitCmd(const std::string&)
     SDL_PushEvent(&evt);
 }
 
-void Engine::toggleBoundingBoxCmd(const std::string&)
+void Engine::toggleWireframeCmd(const std::string&)
 {
-    Log::get().message("Cannot currently display bounding boxes");
+    osg::StateSet *ss = mSceneRoot->getOrCreateStateSet();
+    osg::ref_ptr<osg::PolygonMode> attr = static_cast<osg::PolygonMode*>(
+        ss->getAttribute(osg::StateAttribute::POLYGONMODE)
+    );
+    if(attr.valid())
+        ss->removeAttribute(attr);
+    else
+        ss->setAttribute(new osg::PolygonMode(
+            osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE
+        ));
 }
 
 void Engine::toggleDebugDisplayCmd(const std::string&)
